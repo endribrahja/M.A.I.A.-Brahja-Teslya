@@ -1,0 +1,3 @@
+-r requirements.txt
+pywebpush>=2,<3
+cryptography>=43

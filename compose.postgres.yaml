@@ -1,0 +1,21 @@
+services:
+  app:
+    environment:
+      MAIA_DATABASE_URL: postgresql+psycopg://maia:${MAIA_PG_PASSWORD:?Imposta password alfanumerica}@db:5432/maia
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: maia
+      POSTGRES_USER: maia
+      POSTGRES_PASSWORD: ${MAIA_PG_PASSWORD:?Imposta password alfanumerica}
+    volumes: ["pg_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U maia -d maia"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+volumes:
+  pg_data:

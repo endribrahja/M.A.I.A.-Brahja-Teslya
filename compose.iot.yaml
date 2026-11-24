@@ -1,0 +1,28 @@
+services:
+  app:
+    environment:
+      MAIA_MQTT_HOST: broker
+      MAIA_MQTT_PASSWORD: ${MAIA_MQTT_PASSWORD:?Imposta password MQTT}
+      MAIA_MQTT_KEY: ${MAIA_MQTT_KEY:?Imposta chiave HMAC}
+      MAIA_SIM_INTERVAL: 0
+    depends_on: [broker]
+  broker:
+    image: eclipse-mosquitto:2
+    environment:
+      MAIA_MQTT_PASSWORD: ${MAIA_MQTT_PASSWORD:?Imposta password MQTT}
+    volumes: ["./infra/mosquitto.conf:/mosquitto/config/maia.conf:ro"]
+    entrypoint: ["/bin/sh","-c","mosquitto_passwd -b -c /mosquitto/config/passwd maia \"$$MAIA_MQTT_PASSWORD\" && chown mosquitto:mosquitto /mosquitto/config/passwd && chmod 600 /mosquitto/config/passwd && exec mosquitto -c /mosquitto/config/maia.conf"]
+  simulator:
+    build: .
+    command: ["python","-m","backend.mqtt_bridge"]
+    environment:
+      MAIA_DB: /data/maia.db
+      MAIA_MQTT_HOST: broker
+      MAIA_MQTT_PASSWORD: ${MAIA_MQTT_PASSWORD:?Imposta password MQTT}
+      MAIA_MQTT_KEY: ${MAIA_MQTT_KEY:?Imposta chiave HMAC}
+    volumes: ["maia_data:/data"]
+    depends_on:
+      app:
+        condition: service_healthy
+      broker:
+        condition: service_started

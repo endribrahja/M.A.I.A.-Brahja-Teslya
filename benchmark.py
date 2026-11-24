@@ -5,6 +5,7 @@ from datetime import datetime,timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 with tempfile.TemporaryDirectory() as tmp:
+    os.environ.pop('MAIA_DATABASE_URL',None);os.environ.pop('MAIA_MQTT_HOST',None);os.environ.pop('MAIA_VAPID_PUBLIC',None)
     os.environ['MAIA_DB']=str(Path(tmp)/'bench.db');os.environ['MAIA_SIM_INTERVAL']='0'
     from fastapi.testclient import TestClient
     from sqlalchemy import select,delete
