@@ -1,42 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-PYTHON_BIN="${PYTHON_BIN:-python3}"
-VENV_DIR="${VENV_DIR:-.venv}"
-REQ_FILE="requirements-dev.txt"
-STAMP_FILE="$VENV_DIR/.requirements_installed"
+# Verifica la struttura prima di installare le dipendenze.
+for file in backend/__init__.py backend/main.py backend/config.py backend/db.py backend/security.py backend/simulator.py backend/advanced.py backend/ml.py backend/mqtt_bridge.py backend/push.py frontend/index.html frontend/app.js frontend/advanced.js frontend/api.js frontend/icons.js frontend/style.css frontend/logo.svg requirements.txt requirements-dev.txt; do
+    if [[ ! -f "$file" ]]; then
+        printf 'ERRORE: manca %s in %s\nEstrai tutto lo ZIP nella stessa cartella di start.sh.\n' "$file" "$ROOT_DIR" >&2
+        exit 1
+    fi
+done
 
 if [[ -f .env ]]; then
-  set -a
-  source .env
-  set +a
+    set -a
+    source .env
+    set +a
 fi
 
-if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
-  echo "Errore: $PYTHON_BIN non trovato. Installa Python 3."
-  exit 1
+# Usa l'ambiente attivo, oppure quello locale. Non reinstallare Python.
+if [[ -n "${VIRTUAL_ENV:-}" && -x "$VIRTUAL_ENV/bin/python" ]]; then
+    PY="$VIRTUAL_ENV/bin/python"
+else
+    if [[ ! -x .venv/bin/python ]]; then
+        echo '>>> Creo ambiente virtuale .venv'
+        "${PYTHON_BIN:-python3}" -m venv .venv
+    fi
+    PY="$ROOT_DIR/.venv/bin/python"
 fi
 
-if [[ ! -d "$VENV_DIR" ]]; then
-  echo ">>> Creo l'ambiente virtuale in $VENV_DIR"
-  "$PYTHON_BIN" -m venv "$VENV_DIR"
-fi
-
-source "$VENV_DIR/bin/activate"
-
-if [[ ! -f "$STAMP_FILE" ]] || ! python - <<'PY' >/dev/null 2>&1
-import fastapi, uvicorn, sqlalchemy, argon2
-print("ok")
-PY
-then
-  echo ">>> Installo/aggiorno le dipendenze"
-  python -m pip install --upgrade pip
-  python -m pip install -r "$REQ_FILE"
-  date > "$STAMP_FILE"
-fi
-
-echo ">>> Avvio M.A.I.A. su http://0.0.0.0:${PORT:-8000}"
-exec python -m uvicorn backend.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+# pip non scarica nuovamente i pacchetti già soddisfatti.
+echo '>>> Verifico le dipendenze'
+"$PY" -m pip install --disable-pip-version-check -q -r requirements-dev.txt
+export PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
+"$PY" -c 'import backend.main; print(">>> Backend trovato e importato correttamente")'
+echo ">>> Avvio M.A.I.A. sulla porta ${PORT:-8000}"
+exec "$PY" -m uvicorn backend.main:app --app-dir "$ROOT_DIR" --host 0.0.0.0 --port "${PORT:-8000}"

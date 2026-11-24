@@ -6,15 +6,17 @@ Monitora, comprendi, prevedi. Una piattaforma scolastica full-stack per consumi 
 
 ## 1 · Avvio in GitHub Codespaces
 
-1. Estrai `MAIA_2.0_progetto.zip` e carica **il contenuto della cartella `MAIA_2`** nella radice del repository, compresi `.devcontainer`, `.github` e `.gitignore`.
-2. Apri **Code → Codespaces → Create codespace**. Il devcontainer installa le dipendenze; se usi un Codespace esistente, dalla cartella che contiene `start.sh` esegui:
+1. Scarica `MAIA_2.0_Codespaces.zip`. Estrai **tutto il contenuto direttamente nella radice del repository**, inclusi i file nascosti. Lo ZIP non contiene una cartella esterna: `backend/`, `frontend/` e `start.sh` devono essere allo stesso livello.
+2. Apri il terminale di Codespaces nella radice del repository. Se stai aggiornando un Codespace già aperto, carica lo ZIP nel repository e usa `unzip -o MAIA_2.0_Codespaces.zip` (sovrascrive i file omonimi; conserva una copia di eventuali modifiche prima dell'estrazione).
+3. Avvia:
 
 ```bash
-python -m pip install -r requirements-dev.txt
 bash start.sh
 ```
 
-3. Nella scheda **Ports**, apri la porta **8000**, mantenendola privata. Clicca **Esplora la demo** oppure registrati con dati fittizi (`utente@example.test`, password di almeno 10 caratteri).
+Lo script verifica i file, usa l'ambiente virtuale attivo oppure crea `.venv`, installa le dipendenze mancanti e avvia il backend. Se manca un file, lo indica esplicitamente prima di avviare Uvicorn. I file del database e dell'ambiente virtuale non sono inclusi nello ZIP.
+
+4. Nella scheda **Ports**, apri la porta **8000**, mantenendola privata. Clicca **Esplora la demo** oppure registrati con dati fittizi (`utente@example.test`, password di almeno 10 caratteri).
 
 La demo rapida crea un account indipendente con una password casuale non mostrata. Per riutilizzare lo stesso account, registrati normalmente. Non attivare 2FA sulla demo rapida, perché non conosci la sua password.
 
