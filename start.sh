@@ -4,7 +4,7 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 # Verifica la struttura prima di installare le dipendenze.
-for file in backend/__init__.py backend/main.py backend/config.py backend/db.py backend/security.py backend/simulator.py backend/advanced.py backend/ml.py backend/mqtt_bridge.py backend/push.py frontend/index.html frontend/app.js frontend/advanced.js frontend/api.js frontend/icons.js frontend/style.css frontend/logo.svg requirements.txt requirements-dev.txt; do
+for file in backend/__init__.py backend/main.py backend/config.py backend/db.py backend/security.py backend/simulator.py backend/advanced.py backend/assistant.py backend/ml.py backend/mqtt_bridge.py backend/push.py frontend/index.html frontend/app.js frontend/advanced.js frontend/api.js frontend/icons.js frontend/style.css frontend/logo.svg requirements.txt requirements-dev.txt; do
     if [[ ! -f "$file" ]]; then
         printf 'ERRORE: manca %s in %s\nEstrai tutto lo ZIP nella stessa cartella di start.sh.\n' "$file" "$ROOT_DIR" >&2
         exit 1

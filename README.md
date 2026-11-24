@@ -176,3 +176,39 @@ La destinazione deve essere nuova. Il sorgente è aperto in sola lettura; vengon
 Backup SQLite: `python -m scripts.backup` (usa il DB configurato, salva una copia consistente in `backups/`). Per ripristinare arresta il server, conserva una copia dell'attuale DB e sostituiscilo con il backup; sposta eventuali file `-wal`/`-shm` del vecchio DB fuori dalla directory. Non distribuire backup o segreti nel repository.
 
 Password Argon2id, token hash, cookie HttpOnly/SameSite=Strict, scadenza e logout, TOTP con protezione dal riuso, limite login in memoria, proprietà server-side, origine delle mutazioni, HMAC MQTT, protezione base Web Push. In Codespaces usa porta privata e HTTPS; non pubblicare la beta con dati reali. Prima di produzione servono ulteriori audit, gestione robusta dei segreti TOTP, rate limiting distribuito, recupero account, verifica proxy e TLS, protezione dai rischi di disponibilità, monitoraggio e test su browser/dispositivi reali. Il prototipo non implementa pagamenti, contratti o diagnosi di fughe.
+
+## MAIA Premium 3.0 — interfaccia e assistente conversazionale
+
+Nuova palette, navigazione per aree, tipografia, schede, dark mode, responsive e chat ridisegnate. Tutte le funzioni del prototipo precedente rimangono disponibili.
+
+### Assistente: tre modalità
+
+- **Statistica locale (predefinita):** nessuna chiave o connessione esterna. Domande flessibili su quantità, periodi, medie, tariffe, costi, obiettivi, confronti e previsioni; supporto limitato per follow-up. Non è un LLM e non risponde a tutte le domande generali.
+- **Modello linguistico OpenAI o compatibile:** conversazione libera, contesto delle ultime 12 interazioni, dati sintetici dell'abitazione attiva. Richiede un servizio e un modello disponibili, e può comportare costi. La sottoscrizione ChatGPT Plus non include crediti API.
+- **Ollama locale:** stesso meccanismo conversazionale, senza API commerciali; richiede Ollama in esecuzione sul server e un modello scaricato. Le prestazioni dipendono da RAM e CPU; non è garantito sui Codespaces piccoli.
+
+Configurazione OpenAI: in GitHub Codespaces imposta `OPENAI_API_KEY` come secret (non nel repository) e apri un nuovo terminale/Codespace se necessario. Imposta il nome esatto di un modello disponibile nel tuo account API. Esempio:
+
+```bash
+export MAIA_AI_PROVIDER=openai
+export MAIA_AI_MODEL='NOME_MODELLO_API'
+bash start.sh
+```
+
+Configurazione Ollama (se già installato sul server):
+
+```bash
+ollama pull qwen2.5:3b
+# In un terminale separato, se non è già attivo:
+ollama serve
+# Nel terminale del progetto:
+export MAIA_AI_PROVIDER=ollama
+export MAIA_AI_MODEL=qwen2.5:3b
+bash start.sh
+```
+
+Configurazione persistente: copia `.env.example` in `.env`, modifica le variabili `MAIA_AI_*` necessarie e riavvia. Non sovrascrivere un `.env` già configurato. Le chiavi sono server-side; non vengono inviate al browser. La chat avvisa prima di inviare domande e dati sintetici al provider esterno. Non usare dati personali. Il modello non può eseguire comandi né modificare dati; le risposte possono essere inesatte. In caso di errore del servizio si torna alla modalità statistica. La cronologia è in memoria nella sessione della pagina, separata per abitazione e azzerabile con “Nuova chat”. Non viene salvata sul database.
+
+Riferimento API compatibile: https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create .
+
+Test: `python -m pytest -q`. I test del modello utilizzano una risposta HTTP simulata; una chiave reale o un server Ollama sono necessari per collaudare la generazione effettiva.

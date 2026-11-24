@@ -13,6 +13,7 @@ from .security import current_user, verify_password, digest
 from .simulator import seed_user, household
 from .config import ROOT
 from .ml import detect
+from .assistant import Question, respond, status as assistant_status
 TZ=ZoneInfo('Europe/Rome')
 class HomeName(BaseModel):
     name:str=Field(min_length=1,max_length=80)
@@ -26,8 +27,6 @@ class Settings(HomeName):
     gas_rate:float=Field(ge=0,le=100)
     water_goal:float=Field(gt=0,le=10000)
     gas_goal:float=Field(gt=0,le=10000)
-class Question(BaseModel):
-    question:str=Field(min_length=1,max_length=500)
 class Password(BaseModel):
     password:str=Field(max_length=128)
 class Factor(Password):
@@ -79,19 +78,6 @@ def analyze(db,h):
         projected=round((total or 0)+sum(x['value'] for x in future[:remaining]),3) if future and total is not None else None
         result[m.kind]={'current':current,'previous':previous,'month_total':total,'rate':rate,'goal':goal,'cost':round(total*rate,2) if total is not None else None,'projected':projected,'projected_cost':round(projected*rate,2) if projected is not None else None,'forecast':future,'baseline':base,'days':[{ 'date':str(d),'value':round(v,3) if d not in incomplete else None} for d,v in sorted(daily.items()) if d>=today-timedelta(days=366)],'comparison_30':period(today-timedelta(days=30),today),'prior_30':period(today-timedelta(days=60),today-timedelta(days=30)),'year':period(today-timedelta(days=365),today),'prior_year':period(today-timedelta(days=730),today-timedelta(days=365)),'ml':detect(valid),'outliers':[{'date':str(d),'value':round(v,3)} for d,v in valid[-30:] if base is not None and v>base+max(4*1.4826*mad,base*.6,.05)]}
     return result
-def answer(q,data):
-    q=q.lower(); kinds=['water'] if 'acqua' in q else ['gas'] if 'gas' in q else list(data)
-    lines=[]
-    for k in kinds:
-        if k not in data:continue
-        d=data[k]; name='Acqua' if k=='water' else 'Gas'; a,b=d['comparison_30'],d['prior_30'];
-        if any(w in q for w in ('cost','bollett','spes','euro')): msg=f"Costo variabile registrato nel mese: {d['cost']} €; proiezione: {d['projected_cost']} €. Tariffe di prova, senza imposte né quote fisse."
-        elif any(w in q for w in ('preved','previs','prossim','futur')): msg=f"Previsione dei prossimi 7 giorni: {sum(x['value'] for x in d['forecast'][:7]):.2f} m³ (stima statistica, non certezza)." if d['forecast'] else 'Storico insufficiente per una previsione.'
-        elif any(w in q for w in ('anom','perché','perche','picc','aument')): msg=f"Negli ultimi campioni completi: {len(d['outliers'])} valori sopra il limite adattivo. Non è possibile stabilirne la causa dai soli dati. Verifica lo storico."
-        elif any(w in q for w in ('risparm','obiett','consigl')): msg=f"Obiettivo mensile {d['goal']} m³; consumo registrato {d['month_total']} m³. " + ('Prova a ridurre la durata delle docce e confronta i consumi.' if k=='water' else 'Confronta i consumi con le abitudini di riscaldamento e le condizioni stagionali.')
-        else: msg=f"Ultimi 30 giorni completi: {a['total']} m³ ({a['days']} giorni osservati); periodo precedente: {b['total']} m³ ({b['days']} giorni osservati)."
-        lines.append(name+' — '+msg)
-    return '\n\n'.join(lines)+'\n\nAssistente statistico locale, dati simulati. Nessuna diagnosi o garanzia di sicurezza.'
 def install(app,database):
     @app.get('/api/homes')
     def homes(request:Request,db=Depends(database)):
@@ -110,10 +96,10 @@ def install(app,database):
         db.commit();return home_dict(h)
     @app.get('/api/homes/{id}/analysis')
     def analysis(id:int,request:Request,db=Depends(database)):
-        h=owned(db,current_user(db,request),id);return {'home':home_dict(h),'virtual':household(h),'utilities':analyze(db,h)}
+        h=owned(db,current_user(db,request),id);return {'home':home_dict(h),'virtual':household(h),'utilities':analyze(db,h),'assistant':assistant_status()}
     @app.post('/api/homes/{id}/assistant')
     def assistant(id:int,data:Question,request:Request,db=Depends(database)):
-        h=owned(db,current_user(db,request),id);return {'answer':answer(data.question,analyze(db,h))}
+        h=owned(db,current_user(db,request),id);return respond(data.question,data.history,analyze(db,h))
     @app.get('/api/homes/{id}/report.pdf')
     def report(id:int,request:Request,db=Depends(database)):
         from reportlab.lib import colors

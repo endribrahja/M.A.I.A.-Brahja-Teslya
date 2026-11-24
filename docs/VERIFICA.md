@@ -39,3 +39,10 @@ Prestazioni: benchmark API conforme nelle condizioni provate, non garanzia di pr
 5. Lascia aperta la dashboard con simulazione attiva; verifica l'aggiornamento WebSocket e una notifica generata dal laboratorio. Prova installazione PWA e notifiche del browser.
 6. Se attivi MQTT, verifica il broker, la registrazione firmata e la gestione del disservizio. Se attivi PostgreSQL, ripeti flussi e test sul DB dedicato. Se configuri VAPID, prova un messaggio con sito chiuso e sessione non scaduta.
 7. Esegui backup/ripristino su ambiente isolato. Non usare dati personali reali.
+
+## MAIA Premium 3.0
+
+- 13 test Pytest superati: 11 regressioni della versione precedente e 2 test aggiuntivi per conversazione, contesto autorizzato, validazione e fallback del modello.
+- Sintassi dei moduli JavaScript e dello script Bash verificata; avvio Uvicorn e risposta HTML 200 verificati.
+- Chromium disponibile ma navigazione locale bloccata dalla configurazione dell'ambiente; collaudo visuale end-to-end da ripetere in Codespaces (`scripts/ui_smoke.py`, con Playwright e Chromium installati).
+- La chiamata al provider linguistico è stata verificata con risposta HTTP simulata, non con credenziali o modello reali.
