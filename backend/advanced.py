@@ -1,8 +1,8 @@
 """Estensioni MAIA: analisi, abitazioni, report, assistente locale, TOTP e live."""
-import asyncio, base64, hashlib, hmac, io, math, secrets, struct, time
-from datetime import datetime, timedelta
+import asyncio, base64, hashlib, hmac, secrets, struct, time
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-from statistics import mean, median
+from statistics import median
 from fastapi import Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response, FileResponse
 from pydantic import BaseModel, Field, ConfigDict
@@ -13,6 +13,7 @@ from .security import current_user, verify_password, digest
 from .simulator import seed_user, household
 from .config import ROOT
 from .ml import detect
+from .forecast import forecast
 from .assistant import Question, respond, status as assistant_status
 TZ=ZoneInfo('Europe/Rome')
 class HomeName(BaseModel):
@@ -46,11 +47,11 @@ def verify_otp(factor,code):
         if step>factor.last_step and hmac.compare_digest(otp_at(factor.secret,step),code):
             factor.last_step=step;return True
     return False
-def analyze(db,h):
+def analyze(db,h,history_days=366):
     today=datetime.now(TZ).date(); month=today.replace(day=1); prev=(month-timedelta(days=1)).replace(day=1)
     result={}
     for m in db.scalars(select(Meter).where(Meter.home_id==h.id)):
-        rows=db.scalars(select(Reading).where(Reading.meter_id==m.id).order_by(Reading.ts)).all(); daily={}; incomplete=set()
+        rows=db.scalars(select(Reading).where(Reading.meter_id==m.id,Reading.ts>=int(datetime.combine(today-timedelta(days=733),datetime.min.time(),TZ).timestamp())).order_by(Reading.ts)).all(); daily={}; incomplete=set()
         for a,b in zip(rows,rows[1:]):
             d=datetime.fromtimestamp(b.ts,TZ).date(); gap=b.ts-a.ts
             if gap>28*3600 or b.value<a.value: incomplete.add(d);continue
@@ -60,13 +61,7 @@ def analyze(db,h):
         recent=[v for d,v in valid if d>=today-timedelta(days=30)]
         base=median(recent) if len(recent)>=7 else None
         mad=median(abs(x-base) for x in recent) if base is not None else None
-        # Estimate weekday pattern from historical samples; robust median reduces spikes.
-        future=[]
-        if base is not None:
-            for i in range(1,31):
-                d=today+timedelta(days=i); sample=[v for day,v in valid if day.weekday()==d.weekday() and day>=today-timedelta(days=56)]
-                v=median(sample) if len(sample)>=3 else base
-                future.append({'date':str(d),'value':round(v,3),'low':round(max(0,v-2*1.4826*mad),3),'high':round(v+2*1.4826*mad,3)})
+        future, evaluation=forecast(valid,today,m.kind)
         # Calendar months, comparable elapsed days, rolling previous 30 and 365 days.
         def period(lo,hi):
             values=[v for d,v in valid if lo<=d<hi];return {'total':round(sum(values),3) if values else None,'days':len(values),'expected':(hi-lo).days}
@@ -76,7 +71,7 @@ def analyze(db,h):
         if today in daily and today not in incomplete: total=round((total or 0)+daily[today],3)
         next_month=(month+timedelta(days=32)).replace(day=1); remaining=(next_month-today).days-1
         projected=round((total or 0)+sum(x['value'] for x in future[:remaining]),3) if future and total is not None else None
-        result[m.kind]={'current':current,'previous':previous,'month_total':total,'rate':rate,'goal':goal,'cost':round(total*rate,2) if total is not None else None,'projected':projected,'projected_cost':round(projected*rate,2) if projected is not None else None,'forecast':future,'baseline':base,'days':[{ 'date':str(d),'value':round(v,3) if d not in incomplete else None} for d,v in sorted(daily.items()) if d>=today-timedelta(days=366)],'comparison_30':period(today-timedelta(days=30),today),'prior_30':period(today-timedelta(days=60),today-timedelta(days=30)),'year':period(today-timedelta(days=365),today),'prior_year':period(today-timedelta(days=730),today-timedelta(days=365)),'ml':detect(valid),'outliers':[{'date':str(d),'value':round(v,3)} for d,v in valid[-30:] if base is not None and v>base+max(4*1.4826*mad,base*.6,.05)]}
+        result[m.kind]={'current':current,'previous':previous,'month_total':total,'rate':rate,'goal':goal,'cost':round(total*rate,2) if total is not None else None,'projected':projected,'projected_cost':round(projected*rate,2) if projected is not None else None,'forecast':future,'forecast_evaluation':evaluation,'baseline':base,'days':[{ 'date':str(d),'value':round(v,3) if d not in incomplete else None} for d,v in sorted(daily.items()) if d>=today-timedelta(days=history_days)],'comparison_30':period(today-timedelta(days=30),today),'prior_30':period(today-timedelta(days=60),today-timedelta(days=30)),'year':period(today-timedelta(days=365),today),'prior_year':period(today-timedelta(days=730),today-timedelta(days=365)),'ml':detect(valid),'outliers':[{'date':str(d),'value':round(v,3)} for d,v in valid[-30:] if base is not None and v>base+max(4*1.4826*mad,base*.6,.05)]}
     return result
 def install(app,database):
     @app.get('/api/homes')
@@ -99,18 +94,22 @@ def install(app,database):
         h=owned(db,current_user(db,request),id);return {'home':home_dict(h),'virtual':household(h),'utilities':analyze(db,h),'assistant':assistant_status()}
     @app.post('/api/homes/{id}/assistant')
     def assistant(id:int,data:Question,request:Request,db=Depends(database)):
-        h=owned(db,current_user(db,request),id);return respond(data.question,data.history,analyze(db,h))
+        from .chat import reserve
+        user=current_user(db,request)
+        home=owned(db,user,id)
+        release=reserve(user.id)
+        try:
+            analytics=analyze(db,home)
+            db.rollback()
+            return respond(data.question,data.history,analytics)
+        finally:
+            release()
     @app.get('/api/homes/{id}/report.pdf')
-    def report(id:int,request:Request,db=Depends(database)):
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-        from reportlab.lib.styles import getSampleStyleSheet
-        from xml.sax.saxutils import escape
-        h=owned(db,current_user(db,request),id);d=analyze(db,h);buffer=io.BytesIO(); styles=getSampleStyleSheet(); parts=[Paragraph('M.A.I.A. | Report mensile',styles['Title']),Paragraph(escape(h.name)+' · '+str(datetime.now(TZ).date()),styles['Heading2']),Paragraph('Dati sintetici · stime dimostrative, non bollette ufficiali.',styles['Normal']),Spacer(1,20)]
-        for k,v in d.items():
-            parts.append(Paragraph('Acqua' if k=='water' else 'Gas',styles['Heading2']));t=Table([['Indicatore','Valore'],['Consumo registrato (m³)',str(v['month_total'])],['Giorni completi osservati',str(v['current']['days'])],['Tariffa demo (EUR/m³)',str(v['rate'])],['Costo variabile (EUR)',str(v['cost'])],['Proiezione mensile (EUR)',str(v['projected_cost'])],['Obiettivo (m³)',str(v['goal'])]],colWidths=[260,200]);t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#163d3c')),('TEXTCOLOR',(0,0),(-1,0),colors.white),('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.whitesmoke,colors.white]),('BOTTOMPADDING',(0,0),(-1,-1),9),('TOPPADDING',(0,0),(-1,-1),9)]));parts.extend([t,Spacer(1,18)])
-        parts.append(Paragraph('Le stime non includono tasse o quote fisse. I dati mancanti non sono considerati pari a zero. Le anomalie non dimostrano perdite o fughe di gas.',styles['Normal']));SimpleDocTemplate(buffer,pagesize=A4).build(parts);return Response(buffer.getvalue(),media_type='application/pdf',headers={'Content-Disposition':'attachment; filename="MAIA-report.pdf"'})
+    def report(id:int,request:Request,start:date|None=None,end:date|None=None,db=Depends(database)):
+        from .reports import build_report
+        h=owned(db,current_user(db,request),id)
+        pdf=build_report(db,h,analyze(db,h,history_days=732),start,end,datetime.now(TZ).date(),TZ)
+        return Response(pdf,media_type='application/pdf',headers={'Content-Disposition':'attachment; filename="MAIA-report.pdf"'})
     @app.get('/api/2fa')
     def factor_status(request:Request,db=Depends(database)):
         f=db.get(TwoFactor,current_user(db,request).id);return {'enabled':bool(f and f.enabled)}

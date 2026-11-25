@@ -83,4 +83,26 @@ class Notice(Base):
     reason: Mapped[str] = mapped_column(String(400))
     seen: Mapped[bool] = mapped_column(default=False)
     __table_args__ = (UniqueConstraint('meter_id','ts','kind'),)
+class TwinEvent(Base):
+    __tablename__ = 'twin_events'
+    reading_id: Mapped[int] = mapped_column(ForeignKey('readings.id'), primary_key=True)
+    room: Mapped[str] = mapped_column(String(24))
+    action: Mapped[str] = mapped_column(String(24))
+    units: Mapped[int]
+    minutes: Mapped[int]
+
+class Conversation(Base):
+    __tablename__ = 'conversations'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    home_id: Mapped[int] = mapped_column(ForeignKey('homes.id'), index=True)
+    title: Mapped[str] = mapped_column(String(100))
+    updated: Mapped[int]
+
+class ChatMessage(Base):
+    __tablename__ = 'chat_messages'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey('conversations.id', ondelete='CASCADE'), index=True)
+    role: Mapped[str] = mapped_column(String(12))
+    content: Mapped[str] = mapped_column(String(12000))
+
 def init_db(): Base.metadata.create_all(engine)

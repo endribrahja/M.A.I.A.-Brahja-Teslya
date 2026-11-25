@@ -13,4 +13,12 @@ jobs:
           node-version: '22'
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest -q
-      - run: for f in frontend/*.js; do node --input-type=module --check < "$f"; done
+      - run: npm ci
+      - run: npm run build && npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maia-screenshots
+          path: docs/screenshots/

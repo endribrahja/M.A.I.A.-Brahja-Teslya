@@ -1,0 +1,19 @@
+{
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "name": "maia",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-frontend.mjs",
+    "check": "for f in frontend/*.js scripts/*.mjs; do node --check \"$f\" || exit; done",
+    "test:browser": "bash scripts/browser-run.sh"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "eslint": "9.39.2",
+    "typescript": "5.9.3"
+  }
+}

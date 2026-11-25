@@ -1,4 +1,4 @@
-const CACHE='maia-shell-v3';const ASSETS=['/assets/style.css','/assets/api.js','/assets/app.js','/assets/advanced.js','/assets/icons.js','/assets/logo.svg','/assets/icon-192.png','/assets/icon-512.png'];
+const CACHE='maia-shell-v4';const ASSETS=['/assets/style.css','/assets/studio.css','/assets/experience.js','/assets/insights.js','/assets/twin-view.js','/assets/conversation.js','/assets/api.js','/assets/app.js','/assets/advanced.js','/assets/icons.js','/assets/logo.svg','/assets/icon-192.png','/assets/icon-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('maia-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 // Never cache private API responses, reports or authenticated pages.

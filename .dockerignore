@@ -7,3 +7,7 @@ __pycache__
 data
 *.db
 *.zip
+
+node_modules
+frontend/vendor
+docs/screenshots

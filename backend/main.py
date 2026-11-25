@@ -76,7 +76,7 @@ async def lifespan(app):
     if task:
         task.cancel()
         with suppress(asyncio.CancelledError): await task
-app=FastAPI(title='M.A.I.A. API',version='2.0.0',lifespan=lifespan)
+app=FastAPI(title='M.A.I.A. API',version='4.0.0',lifespan=lifespan)
 @app.middleware('http')
 async def headers(request,call_next):
     # JSON-only mutations plus same-site cookie and same-origin check.
@@ -99,7 +99,7 @@ async def database_busy(request,exc): return JSONResponse({'detail':'Database mo
 async def validation_error(request,exc): return JSONResponse({'detail':'Controlla i campi inseriti: formato o valore non valido.'},422)
 def database(request:Request):
     with Session() as db:
-        if request.method in ('POST','PATCH','DELETE'): lock_writes(db)
+        if request.method in ('POST','PATCH','DELETE') and not request.url.path.endswith('/assistant'): lock_writes(db)
         yield db
 class Login(BaseModel):
     email: str=Field(max_length=254)
@@ -112,7 +112,7 @@ class Register(Login,Profile):
     confirm: str=Field(max_length=128)
 class Scenario(BaseModel):
     home_id: int | None = None
-    scenario: Literal['normal','high','missing','invalid','house']='normal'
+    scenario: Literal['normal','high','missing','invalid','house','offline','gas_high','night_high']='normal'
 def profile(u): return {'first':u.first,'last':u.last,'email':u.email}
 def names(data):
     a,b=data.first.strip(),data.last.strip()
@@ -161,7 +161,8 @@ def owned_meter(db,u,id):
     return m
 def meter_info(db,m):
     r=latest(db,m); now=int(time.time())
-    return {'id':m.id,'kind':m.kind,'home_id':m.home_id,'code':m.code,'label':LABEL[m.kind],'last':r.value/1000 if r else None,'updated':r.ts if r else None,'status':'Da verificare' if not r or now-r.ts>2*DAY else 'Attivo','threshold':THRESHOLDS[m.kind]}
+    offline=r and db.scalar(select(Notice.id).where(Notice.meter_id==m.id,Notice.kind=='offline',Notice.ts>r.ts).limit(1))
+    return {'id':m.id,'kind':m.kind,'home_id':m.home_id,'code':m.code,'label':LABEL[m.kind],'last':r.value/1000 if r else None,'updated':r.ts if r else None,'status':'Offline' if offline else 'Da verificare' if not r or now-r.ts>2*DAY else 'Attivo','threshold':THRESHOLDS[m.kind]}
 @app.get('/api/meters')
 def meters(request:Request,db=Depends(database)):
     u=current_user(db,request); return [meter_info(db,m) for m in db.scalars(select(Meter).where(Meter.user_id==u.id).order_by(Meter.id))]
@@ -172,18 +173,28 @@ def bounds(start,end):
     if start>end or end>datetime.now(TZ).date() or (end-start).days>366: raise HTTPException(422,'Seleziona un intervallo valido (massimo 367 giorni).')
     return int(datetime.combine(start,clock.min,TZ).timestamp()),int(datetime.combine(end+timedelta(days=1),clock.min,TZ).timestamp())
 @app.get('/api/meters/{id}/readings')
-def readings(id:int,start:date,end:date,request:Request,db=Depends(database)):
+def readings(id:int,start:date,end:date,request:Request,anchor:bool=False,db=Depends(database)):
     u=current_user(db,request); m=owned_meter(db,u,id); lo,hi=bounds(start,end)
     rows=db.scalars(select(Reading).where(Reading.meter_id==m.id,Reading.ts>=lo,Reading.ts<hi).order_by(Reading.ts)).all()
-    values=[]; daily={}; total=0; prev=None
+    values=[]; daily={}; total=0; observed=0; incomplete=set()
+    prev=db.scalar(select(Reading).where(Reading.meter_id==m.id,Reading.ts<lo).order_by(Reading.ts.desc()).limit(1)) if anchor else None
     for r in rows:
         diff=None if prev is None else r.value-prev.value
+        day=datetime.fromtimestamp(r.ts,TZ).date().isoformat()
+        if anchor and prev and (r.ts-prev.ts>28*3600 or diff<0):
+            diff=None
+            incomplete.add(day)
         if diff is not None:
-            total+=diff; day=datetime.fromtimestamp(r.ts,TZ).date().isoformat(); daily[day]=daily.get(day,0)+diff
+            total+=diff; observed+=1; daily[day]=daily.get(day,0)+diff
         values.append({'ts':r.ts,'value':r.value/1000,'consumption':None if diff is None else diff/1000}); prev=r
-    days=[{'date':(start+timedelta(days=i)).isoformat(),'value':daily.get((start+timedelta(days=i)).isoformat())/1000 if (start+timedelta(days=i)).isoformat() in daily else None} for i in range((end-start).days+1)]
-    return {'meter':meter_info(db,m),'total':total/1000 if len(rows)>=2 else None,'count':len(rows),'days':days,'rows':values}
-def notice_data(n,m): return {'id':n.id,'meter_id':m.id,'home_id':m.home_id,'meter':m.code,'utility':m.kind,'kind':n.kind,'severity':('Alta' if n.kind in ('elevato','incoerente','obiettivo100') else 'Attenzione' if n.kind in ('mancante','adattiva') else 'Informativa'),'ts':n.ts,'start':n.start,'value':n.value,'reason':n.reason,'seen':n.seen}
+    if anchor:
+        daily={key:value for key,value in daily.items() if key not in incomplete}
+        total=sum(daily.values())
+        observed=len(daily)
+    dates=[(start+timedelta(days=i)).isoformat() for i in range((end-start).days+1)]
+    days=[{'date':day,'value':daily[day]/1000 if day in daily else None} for day in dates]
+    return {'meter':meter_info(db,m),'total':total/1000 if observed else None,'count':len(rows),'days':days,'rows':values}
+def notice_data(n,m): return {'id':n.id,'meter_id':m.id,'home_id':m.home_id,'meter':m.code,'utility':m.kind,'kind':n.kind,'severity':('Alta' if n.kind in ('elevato','incoerente','obiettivo100') else 'Attenzione' if n.kind in ('mancante','adattiva','offline','notturno') else 'Informativa'),'ts':n.ts,'start':n.start,'value':n.value,'reason':n.reason,'seen':n.seen}
 def owned_notice(db,u,id):
     row=db.execute(select(Notice,Meter).join(Meter,Notice.meter_id==Meter.id).where(Notice.id==id,Meter.user_id==u.id)).first()
     if not row: raise HTTPException(404,'Notifica non trovata.')
@@ -211,6 +222,10 @@ def config(request:Request,db=Depends(database)):
     current_user(db,request); return {'interval':INTERVAL,'thresholds':THRESHOLDS,'transport':'MQTT' if os.getenv('MAIA_MQTT_HOST') else 'locale'}
 from .advanced import install
 install(app,database)
+from .twin import install_twin
+install_twin(app,database)
+from .chat import install_chat
+install_chat(app,database)
 from .push import install_push
 install_push(app,database)
 app.mount('/assets',StaticFiles(directory=ROOT/'frontend'),name='assets')

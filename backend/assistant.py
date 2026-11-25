@@ -19,7 +19,7 @@ def config():
     mode=os.getenv('MAIA_AI_PROVIDER','local').lower()
     if mode not in ('openai','ollama','compatible'): return 'local','','',''
     url={'openai':'https://api.openai.com/v1','ollama':'http://127.0.0.1:11434/v1','compatible':''}[mode]
-    if mode!='openai': url=os.getenv('MAIA_AI_BASE_URL',url)
+    if mode!='openai': url=os.getenv('MAIA_AI_BASE_URL') or url
     key=os.getenv('MAIA_AI_API_KEY','') or (os.getenv('OPENAI_API_KEY','') if mode=='openai' else '')
     model=os.getenv('MAIA_AI_MODEL','').strip()
     return mode,url.rstrip('/'),key,model

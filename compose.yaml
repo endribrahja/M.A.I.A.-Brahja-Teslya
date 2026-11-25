@@ -4,6 +4,11 @@ services:
     ports: ["127.0.0.1:8000:8000"]
     environment:
       MAIA_DB: /data/maia.db
+      MAIA_AI_PROVIDER: ${MAIA_AI_PROVIDER:-local}
+      MAIA_AI_MODEL: ${MAIA_AI_MODEL:-}
+      MAIA_AI_BASE_URL: ${MAIA_AI_BASE_URL:-}
+      MAIA_AI_API_KEY: ${MAIA_AI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes: ["maia_data:/data"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"]

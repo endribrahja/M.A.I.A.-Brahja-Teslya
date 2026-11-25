@@ -5,3 +5,6 @@ __pycache__/
 .env
 /data/
 /backups/
+
+/node_modules/
+/frontend/vendor/

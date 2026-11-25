@@ -74,18 +74,32 @@ def household(home):
             'gas':home.people*.35+{'winter':4.8,'mid':1.7,'summer':.1}[home.season]}
 def simulate(db,meters,scenario='normal'):
     now=int(time.time()); count=0
+    moment=datetime.fromtimestamp(now,ZoneInfo('Europe/Rome'))
     for meter in meters:
-        if not meter.demo: continue
+        if not meter.demo or (scenario in ('gas_high','night_high') and meter.kind!=('gas' if scenario=='gas_high' else 'water')): continue
         prev=latest(db,meter)
         if not prev or now<=prev.ts: continue
+        if scenario=='offline':
+            notice(db,meter,now,prev.ts,'offline','Scenario demo','Sospensione simulata del contatore fino alla prossima lettura valida.')
+            continue
         if scenario=='missing':
             notice(db,meter,now,prev.ts,'mancante','Scenario demo','Simulazione esplicita di una lettura attesa non ricevuta. Nessuna nuova lettura registrata.')
             continue
-        if scenario=='high': delta=round(THRESHOLDS[meter.kind]*max(1,(now-prev.ts)/DAY)*1500)
+        if scenario in ('high','gas_high','night_high'):
+            delta=round(THRESHOLDS[meter.kind]*max(1,(now-prev.ts)/DAY)*1500)
+            if scenario=='night_high':
+                notice(db,meter,now,prev.ts,'notturno','Scenario demo','Profilo notturno accelerato. L’ora della registrazione è quella di esecuzione.')
         elif scenario=='invalid': delta=-100
         else:
             home=db.get(Home,meter.home_id); rate=household(home)[meter.kind]
-            expected=rate*1000*min(now-prev.ts,DAY)/DAY*random.uniform(.85,1.15)
+            hour=moment.hour
+            activity=.25 if hour<6 else 1.55 if 6<=hour<9 or 17<=hour<22 else .82
+            weekend=1.12 if moment.weekday()>=5 else 1
+            temperature=13-11*math.cos(2*math.pi*(moment.timetuple().tm_yday-15)/365.25)
+            heating=max(.4,min(1.5,(20-temperature)/16)) if meter.kind=='gas' and home.season!='summer' else 1
+            elapsed=min(now-prev.ts,DAY)
+            profile=activity*weekend*heating if elapsed<3600 else heating
+            expected=rate*1000*elapsed/DAY*profile*random.uniform(.85,1.15)
             delta=math.floor(expected)+(random.random()<expected%1)
             if scenario=='house': delta=round(rate*1000)
         count+=bool(ingest(db,meter.id,now,(prev.value+delta)/1000))

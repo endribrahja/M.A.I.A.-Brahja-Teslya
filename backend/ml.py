@@ -1,8 +1,12 @@
 """Modello non supervisionato: addestramento su campioni passati, verifica su campioni successivi."""
-from datetime import timedelta
+from functools import lru_cache
 from math import sin,cos,pi
 
 def detect(valid):
+    return detect_recent(tuple(valid[-100:]))
+
+@lru_cache(maxsize=128)
+def detect_recent(valid):
     if len(valid)<45:return {'status':'Storico insufficiente','training':0,'points':[]}
     from sklearn.ensemble import IsolationForest
     # Separate training and evaluation, no future leakage. Weekday features give weekly context.
