@@ -1,3 +1,4 @@
+import {mountQuestionCatalog} from './question-catalog.js';
 import {api,esc,num} from './api.js';
 
 function markdown(target, text) {
@@ -28,7 +29,7 @@ function markdown(target, text) {
     const heading=line.match(/^#{1,4}\s+(.*)$/);
     block=document.createElement(heading?'h3':'p');
     const content=heading?heading[1]:line;
-    for(const token of content.split(/(\*\*[^*]+\*\*|`[^`]+`)/)) {
+    for(const token of content.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\((?:https?:\/\/|\/#)[^\s)]+\))/)) {
       if(token.startsWith('**')&&token.endsWith('**')) {
         const strong=document.createElement('strong');
         strong.textContent=token.slice(2,-2);
@@ -37,7 +38,16 @@ function markdown(target, text) {
         const code=document.createElement('code');
         code.textContent=token.slice(1,-1);
         block.append(code);
-      } else block.append(token);
+      } else {
+        const link=token.match(/^\[([^\]]+)\]\(((?:https?:\/\/|\/#)[^\s)]+)\)$/);
+        if(link) {
+          const anchor=document.createElement('a');
+          anchor.href=link[2];
+          anchor.textContent=link[1];
+          if(!link[2].startsWith('/#')) {anchor.target='_blank';anchor.rel='noopener noreferrer';}
+          block.append(anchor);
+        } else block.append(token);
+      }
     }
     target.append(block);
   }
@@ -77,25 +87,63 @@ function toolChart(series) {
   return node;
 }
 
-export function mountConversation(home, openScene) {
+export function mountConversation(home, openScene, context={}) {
   const root=document.querySelector('.chat-card');
   const log=root.querySelector('#chat-log'), form=root.querySelector('#assistant-form');
   const url='/homes/'+home+'/conversations';
   const lifecycle=new AbortController();
-  const panel=document.createElement('div');
+  const panel=document.createElement('details');
   panel.className='chat-controls';
-  panel.innerHTML='<input type="search" aria-label="Cerca conversazioni" placeholder="Cerca conversazioni"><select aria-label="Conversazioni salvate"></select><button class="secondary small" data-chat="rename">Rinomina</button><button class="secondary small" data-chat="delete">Elimina</button><button class="secondary small" data-chat="regenerate">Rigenera</button><button class="secondary small" data-chat="stop" disabled>Interrompi</button><span role="status" data-chat-status></span>';
-  log.before(panel);
+  panel.open=matchMedia('(min-width: 1024px)').matches;
+  panel.innerHTML='<summary>Cronologia</summary><div class="chat-history"><input type="search" aria-label="Cerca conversazioni" placeholder="Cerca conversazioni"><select aria-label="Conversazioni salvate"></select><div class="chat-history-actions"><button class="secondary small" data-chat="rename">Rinomina</button><button class="secondary small" data-chat="delete">Elimina</button><button class="secondary small" data-chat="regenerate">Rigenera</button></div></div>';
+  root.querySelector('.chat-workspace').prepend(panel);
   const select=panel.querySelector('select'), search=panel.querySelector('input');
-  const status=panel.querySelector('[data-chat-status]');
-  const stop=panel.querySelector('[data-chat=stop]');
-  let list=[], activeId=null, generation, revision=0;
+  const status=root.querySelector('[data-chat-status]'), modelStatus=root.querySelector('[data-model-status]');
+  const stop=root.querySelector('[data-chat=stop]'), textarea=form.querySelector('textarea');
+  const submit=form.querySelector('[type=submit]'), suggestions=root.querySelector('.suggestions');
+  const configured=root.dataset.modelConfigured==='true';
+  const configuredLabel=modelStatus.textContent.replace('Modello configurato','Modello attivo');
+  const memoryKey='maia-conversation-'+home;
+  mountQuestionCatalog(form.querySelector('[data-question-catalog]'),textarea,configured);
+  let list=[], activeId=null, generation, revision=0, hasMessages=false;
   function options() {
-    const query=search.value.trim().toLowerCase();
-    select.innerHTML='<option value="">Nuova conversazione</option>'+list.filter(item=>item.id===activeId||item.title.toLowerCase().includes(query)).map(item=>'<option value="'+item.id+'">'+esc(item.title)+'</option>').join('');
+    const query=search.value.trim().toLocaleLowerCase('it');
+    const days=new Map();
+    for(const item of list) {
+      if(item.id!==activeId&&!item.title.toLocaleLowerCase('it').includes(query)) continue;
+      const label=new Intl.DateTimeFormat('it-IT',{dateStyle:'medium',timeZone:'Europe/Rome'}).format(item.updated*1000);
+      if(!days.has(label)) days.set(label,[]);
+      days.get(label).push(`<option value="${item.id}">${esc(item.title)}</option>`);
+    }
+    select.innerHTML='<option value="">Nuova conversazione</option>'+[...days].map(([label,items])=>`<optgroup label="${esc(label)}">${items.join('')}</optgroup>`).join('');
     select.value=activeId??'';
-    panel.querySelectorAll('[data-chat]:not([data-chat=stop])').forEach(b=>b.disabled=!activeId||!!generation);
+    panel.querySelectorAll('[data-chat]').forEach(b=>b.disabled=!activeId||!!generation||(b.dataset.chat==='regenerate'&&!hasMessages));
   }
+  function showSuggestions(last='') {
+    const query=last.toLocaleLowerCase('it');
+    const items=query.includes('gas')?['Quanto gas ho consumato questo mese?','Come posso ridurre il consumo di gas?']:
+      query.includes('acqua')?['Quanta acqua ho consumato oggi?','Come posso ridurre il consumo di acqua?']:
+      [context.hasAnomaly?(configured?'Spiegami l’ultima anomalia.':'Ho registrato consumi insoliti?'):'Come stanno andando i miei consumi?',
+        context.nearGoal?'Come posso evitare di superare il mio obiettivo?':'Come si confrontano i miei consumi con il periodo precedente?',
+        context.multipleHomes&&configured?'Come posso confrontare i dati delle mie abitazioni?':'Quanto sto spendendo questo mese?'];
+    suggestions.replaceChildren();
+    for(const question of items.filter(question=>question.toLocaleLowerCase('it')!==query).slice(0,3)) {
+      const button=document.createElement('button');
+      button.className='secondary small';
+      button.textContent=question;
+      button.dataset.question=question;
+      suggestions.append(button);
+    }
+  }
+  function welcome() {
+    log.replaceChildren(root.querySelector('#chat-welcome').content.cloneNode(true));
+    showSuggestions();
+  }
+  function resizeComposer() {
+    textarea.style.height='auto';
+    textarea.style.height=Math.min(150,textarea.scrollHeight)+'px';
+  }
+  textarea.addEventListener('input',resizeComposer,{signal:lifecycle.signal});
   function bubble(role,text) {
     const shell=document.createElement('article'), content=document.createElement('div');
     shell.className='chat-bubble '+(role==='user'?'from-user':'');
@@ -119,19 +167,28 @@ export function mountConversation(home, openScene) {
   async function load(id) {
     const version=++revision;
     activeId=id;
+    hasMessages=false;
+    if(id) window.sessionStorage.setItem(memoryKey,String(id));
+    else window.sessionStorage.removeItem(memoryKey);
     log.replaceChildren();
     options();
-    if(!id) return;
+    if(!id) {welcome();return;}
     const result=await api(url+'/'+id);
     if(version!==revision||lifecycle.signal.aborted) return;
-    for(const item of result.messages) bubble(item.role,item.content);
+    hasMessages=result.messages.length>0;
+    if(!hasMessages) welcome();
+    else for(const item of result.messages) bubble(item.role,item.content);
+    showSuggestions(result.messages.findLast(item=>item.role==='user')?.content);
+    options();
   }
   function error(err) {status.textContent=err.message??'Operazione non riuscita.';}
   async function ask(question, regenerate=false) {
     if(generation||(!question&&!regenerate)) return;
     const controller=generation=new AbortController();
     select.disabled=true;
-    stop.disabled=false;
+    stop.hidden=false;
+    submit.disabled=true;
+    suggestions.replaceChildren();
     options();
     status.textContent='Elaborazione…';
     let view, report;
@@ -140,6 +197,7 @@ export function mountConversation(home, openScene) {
       if(!activeId) {
         const created=await api(url,'POST');
         activeId=created.id;
+        window.sessionStorage.setItem(memoryKey,String(activeId));
       }
       if(lifecycle.signal.aborted) return;
       const response=await fetch('/api'+url+'/'+activeId+'/generate',{
@@ -147,13 +205,15 @@ export function mountConversation(home, openScene) {
         body:JSON.stringify(regenerate?{regenerate:true}:{question}),signal:controller.signal
       });
       if(!response.ok) throw new Error((await response.json()).detail??'Generazione non riuscita.');
+      log.querySelector('.chat-welcome')?.remove();
       if(question) bubble('user',question);
-      else {
+      hasMessages=true;
+      if(!question) {
         const last=log.lastElementChild;
         if(last&&!last.classList.contains('from-user')) last.remove();
       }
       const target=bubble('assistant','');
-      let text='', buffer='', done=false;
+      let text='', buffer='', done=false, responseMode;
       const reader=response.body.pipeThrough(new TextDecoderStream()).getReader();
       try {
         while(true) {
@@ -164,8 +224,15 @@ export function mountConversation(home, openScene) {
           buffer=lines.pop();
           for(const line of lines) {
             const message=JSON.parse(line);
-            if(message.type==='text') {text+=message.value;markdown(target,text);log.scrollTop=log.scrollHeight;}
-            if(message.type==='mode') status.textContent=({model:'Modello linguistico',local:'Analisi statistica',fallback:'Fallback statistico'})[message.value];
+            if(message.type==='text') {
+              if(!text&&responseMode==='model') modelStatus.textContent=configuredLabel;
+              text+=message.value;markdown(target,text);log.scrollTop=log.scrollHeight;
+            }
+            if(message.type==='mode') {
+              responseMode=message.value;
+              if(message.value==='fallback') modelStatus.textContent='Modello indisponibile · Analisi statistica locale';
+              if(message.value==='local') modelStatus.textContent='Analisi statistica locale · Capacità limitate';
+            }
             if(message.type==='error') throw new Error(message.value);
             if(message.type==='view') view=message.value;
             if(message.type==='report') report=message.value;
@@ -175,6 +242,8 @@ export function mountConversation(home, openScene) {
         }
       } finally {await reader.cancel().catch(()=>{});}
       if(!done) throw new Error('Generazione interrotta. Puoi rigenerare la risposta.');
+      status.textContent='';
+      showSuggestions(question);
       for(const payload of series) {
         const chart=toolChart(payload);
         if(chart) target.after(chart);
@@ -189,7 +258,7 @@ export function mountConversation(home, openScene) {
       if(view) {
         const button=document.createElement('button');
         button.className='secondary small';
-        button.textContent='Apri vista nella casa';
+        button.textContent='Visualizza nella casa 3D';
         button.onclick=()=>openScene(view);
         target.after(button);
       }
@@ -199,7 +268,8 @@ export function mountConversation(home, openScene) {
     } finally {
       generation=null;
       select.disabled=false;
-      stop.disabled=true;
+      stop.hidden=true;
+      submit.disabled=false;
       if(!lifecycle.signal.aborted) refresh().catch(error);
     }
   }
@@ -216,7 +286,7 @@ export function mountConversation(home, openScene) {
     event.preventDefault();
     event.stopPropagation();
     const question=new FormData(form).get('question').trim();
-    if(question&&!generation) {form.reset();ask(question);}
+    if(question&&!generation) {form.reset();resizeComposer();ask(question);}
   },{signal:lifecycle.signal});
   root.addEventListener('click',async event=>{
     const button=event.target.closest('button');
@@ -226,7 +296,7 @@ export function mountConversation(home, openScene) {
     if(generation) return;
     try {
       if(button.hasAttribute('data-chat-clear')) await load(null);
-      if(button.dataset.question) await ask(button.dataset.question);
+      if(button.dataset.question) {textarea.value=button.dataset.question;resizeComposer();textarea.focus();}
       if(button.dataset.chat==='regenerate') await ask('',true);
       if(button.dataset.chat==='rename') {
         const title=prompt('Titolo della conversazione',list.find(item=>item.id===activeId)?.title??'');
@@ -239,6 +309,11 @@ export function mountConversation(home, openScene) {
       }
     } catch(err) {error(err);}
   },{signal:lifecycle.signal});
-  refresh().catch(error);
+  welcome();
+  refresh().then(()=>{
+    if(lifecycle.signal.aborted||revision||generation||activeId) return;
+    const saved=Number(window.sessionStorage.getItem(memoryKey));
+    if(list.some(item=>item.id===saved)) return load(saved);
+  }).catch(error);
   return ()=>{lifecycle.abort();generation?.abort();};
 }

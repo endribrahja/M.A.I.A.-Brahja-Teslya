@@ -18,6 +18,16 @@ export function actionableInsights(data) {
     tips.map(([name,tip])=>'<div><b>'+name+'</b><p>'+esc(tip)+'</p></div>').join('')+'</div></section>';
 }
 
+export function waterFootprint(data) {
+  const row=data.utilities.water;
+  if(!row) return '';
+  const current=row.comparison_30, previous=row.prior_30;
+  const delta=current.days&&previous.days
+    ? Math.round((current.total/current.days-previous.total/previous.days)*1000) : null;
+  const mark=delta==null?'N/D':(delta>0?'+':'')+num(delta)+' L/giorno';
+  return '<section class="card spaced footprint"><div><h2>Risorse e sostenibilità</h2><p>Variazione dell’acqua per giorno osservato rispetto ai 30 giorni precedenti.</p><small>Conversione: 1 m³ = 1.000 L. Copertura: '+current.days+'/30 e '+previous.days+'/30 giorni.</small></div><strong>'+mark+'</strong></section>';
+}
+
 export function seasonalMap(data) {
   return '<section class="card spaced"><h2>Ultimi 365 giorni</h2><p class="muted">Confronto visivo per utenza. Grigio indica una lettura assente.</p><div class="charts-grid">'+
     Object.entries(data.utilities).map(([kind,row])=>{

@@ -45,6 +45,7 @@ export function mountChart(host, series, output) {
       shape.computeVertexNormals();
       const surface=new T.Mesh(shape,new T.MeshStandardMaterial({color:colors[kind],side:T.DoubleSide,roughness:.45}));
       surface.visible=false;
+      surface.userData.kind=kind;
       graphics.scene.add(surface);
       surfaces.push(surface);
     }
@@ -60,22 +61,47 @@ export function mountChart(host, series, output) {
   graphics.canvas.addEventListener('pointerup',e=>{
     if(!start||Math.hypot(e.clientX-start[0],e.clientY-start[1])>5) return;
     const target=graphics.hit(e,bars);
+    graphics.invalidate();
     if(selected) selected.material=selected.userData.material;
     selected=target;
     if(!target) {output.textContent=label;return;}
     const {kind,date,value}=target.userData;
     target.material=selectedMaterial;
-    output.textContent=(kind==='water'?'Acqua':'Gas')+' · '+day(date)+' · '+num(value)+' m³';
+    output.textContent=(kind==='water'?'Acqua':'Gas')+' · '+day(date)+' · '+num(value)+' m³ · Contatore simulato';
   });
-  const picker=host.parentElement.querySelector('[data-chart-style]');
+  const tooltip=document.createElement('div');
+  tooltip.className='chart-tooltip';
+  tooltip.setAttribute('aria-hidden','true');
+  tooltip.hidden=true;
+  host.append(tooltip);
+  graphics.canvas.addEventListener('pointermove',event=>{
+    const target=graphics.hit(event,bars);
+    tooltip.hidden=!target;
+    if(!target) return;
+    const {kind,date,value}=target.userData;
+    tooltip.textContent=(kind==='water'?'Acqua':'Gas')+' · '+day(date)+' · '+num(value)+' m³ · Contatore simulato';
+    const bounds=host.getBoundingClientRect();
+    tooltip.style.left=Math.min(event.clientX-bounds.left+10,bounds.width-tooltip.offsetWidth-8)+'px';
+    tooltip.style.top=Math.max(8,event.clientY-bounds.top-38)+'px';
+  });
+  graphics.canvas.addEventListener('pointerleave',()=>{tooltip.hidden=true;});
+  const tools=host.parentElement.querySelector('.spatial-controls');
+  const picker=tools.querySelector('[data-chart-style]');
+  const filters=[...tools.querySelectorAll('[data-chart-series]')];
+  const events=new AbortController();
+  const listen={signal:events.signal};
+  const reset=tools.querySelector('[data-chart-reset]');
   function applyStyle() {
+    graphics.invalidate();
     const ribbon=picker.value==='surface';
-    for(const surface of surfaces) surface.visible=ribbon;
-    for(const bar of bars) bar.visible=!ribbon;
+    const enabled=new Set(filters.filter(input=>input.checked).map(input=>input.dataset.chartSeries));
+    for(const surface of surfaces) surface.visible=ribbon&&enabled.has(surface.userData.kind);
+    for(const bar of bars) bar.visible=!ribbon&&enabled.has(bar.userData.kind);
     output.textContent=ribbon?'Superfici per utenza. I tratti tra dati mancanti rimangono vuoti.':label;
   }
-  picker.addEventListener('change',applyStyle);
+  tools.addEventListener('change',applyStyle,listen);
+  reset.addEventListener('click',()=>graphics.focus([12,11,21],[0,2,0]),listen);
   applyStyle();
   graphics.run();
-  return ()=>{picker.removeEventListener('change',applyStyle);geometry.dispose();selectedMaterial.dispose();graphics.dispose();};
+  return ()=>{events.abort();tooltip.remove();geometry.dispose();selectedMaterial.dispose();graphics.dispose();};
 }

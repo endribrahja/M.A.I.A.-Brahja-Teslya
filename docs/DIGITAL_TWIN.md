@@ -1,6 +1,6 @@
 # Digital twin
 
-La casa è un modello procedurale a un piano con 11 spazi selezionabili e due contatori. Le viste comprendono esterno, sezione, senza tetto, esplosa, consumi e anomalie. Si può ruotare, spostare, zoomare e inquadrare la scena dall’alto, lateralmente o in isometria. Le tubazioni sono attivabili separatamente e la luce passa da giorno a notte. La qualità può essere automatica, bassa, media o alta. La pianta è disponibile su richiesta e se WebGL è indisponibile.
+Il modello procedurale ha un unico piano, un asse di circolazione centrale, ambienti sociali e di servizio e due contatori. Apri la [guida dell’interfaccia](ESPERIENZA.md#casa-virtuale) per i dettagli su modalità, proiezioni, orientamento e pianta alternativa.
 
 L’attivazione di un ciclo applica un incremento al contatore dimostrativo e salva l’attribuzione alla stanza nella stessa transazione. Le stime per stanza considerano soltanto questi eventi. I contatori mostrano il flusso medio stimato del ciclo soltanto se corrisponde all’ultima lettura. La data del ciclo accelerato è l’istante di registrazione. I timestamp rimangono ordinati. Se un contatore è appena stato aggiornato, riprova dopo un secondo.
 

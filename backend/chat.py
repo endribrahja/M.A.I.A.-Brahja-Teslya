@@ -23,8 +23,8 @@ from .security import current_user, digest
 from .simulator import latest
 from .twin import snapshot
 
-ROOMS = ['entry','living','kitchen','dining','bathroom','primary','bedroom','laundry','utility','garage','garden']
-VIEWS = ['water', 'gas', 'anomalies', *ROOMS]
+ROOMS = ['entry','living','kitchen','dining','bathroom','primary','bedroom','laundry','utility','garage','garden','hall']
+VIEWS = ['water', 'gas', 'anomalies', 'reset', 'water-system', 'gas-system', *ROOMS]
 UTILITIES = ['water', 'gas']
 LIMIT = 12000
 rate_lock = threading.Lock()
@@ -112,7 +112,7 @@ TOOLS = [
     tool('get_home_details', 'Profilo sintetico senza dati identificativi.'),
     tool('calculate_savings', 'Simula la riduzione percentuale sul volume e costo del mese osservato.', Savings),
     tool('generate_report', 'Prepara il download del report PDF per l’intervallo richiesto.', Period),
-    tool('focus_home_view', 'Mostra una stanza, il contatore o le anomalie sulla casa virtuale.', SceneAction),
+    tool('focus_home_view', 'Mostra stanza, contatore, impianto, anomalie o vista iniziale sulla casa virtuale.', SceneAction),
 ]
 TOOLS[-1]['function']['parameters']['properties']['target']['enum'] = VIEWS
 

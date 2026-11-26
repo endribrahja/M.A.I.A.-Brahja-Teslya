@@ -40,7 +40,7 @@ La verifica OpenAI è una richiesta API a consumo. Per l’interfaccia avvia o r
 
 ## Dati e strumenti
 
-Il provider riceve testo degli ultimi turni e risultati sintetici degli strumenti invocati. Gli strumenti sono limitati all’abitazione della conversazione e ricontrollano sessione e proprietà. Possono consultare letture, profilo sintetico, confronti, obiettivi, costi, previsioni, stato dei contatori, avvisi e consumi attribuiti alle stanze. La selezione di una vista richiede un clic sul risultato della chat. L’assistente non dispone di azioni di scrittura.
+Il provider riceve testo degli ultimi turni e risultati sintetici degli strumenti invocati. Gli strumenti sono limitati all’abitazione della conversazione e ricontrollano sessione e proprietà. Possono consultare letture, profilo sintetico, confronti, obiettivi, costi, previsioni, stato dei contatori, avvisi e consumi attribuiti alle stanze. Gli strumenti di storico e previsione possono mostrare grafici. Lo strumento report prepara il link al PDF per il periodo richiesto. La selezione di una vista richiede un clic sul risultato della chat. L’assistente non dispone di azioni di scrittura.
 
 Il server limita a una generazione simultanea per account e a sei avvii al minuto per processo. Le conversazioni sono cancellabili e hanno un limite di 100 messaggi. Le richieste al provider includono fino a 12 turni, ciascuno limitato a 1.400 caratteri. Il frontend visualizza Markdown di base mediante nodi di testo. Le interruzioni possono essere rigenerate.
 

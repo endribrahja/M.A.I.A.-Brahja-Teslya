@@ -173,8 +173,19 @@ def bounds(start,end):
     if start>end or end>datetime.now(TZ).date() or (end-start).days>366: raise HTTPException(422,'Seleziona un intervallo valido (massimo 367 giorni).')
     return int(datetime.combine(start,clock.min,TZ).timestamp()),int(datetime.combine(end+timedelta(days=1),clock.min,TZ).timestamp())
 @app.get('/api/meters/{id}/readings')
-def readings(id:int,start:date,end:date,request:Request,anchor:bool=False,db=Depends(database)):
+def readings(id:int,start:date,end:date,request:Request,anchor:bool=False,
+             rolling_end:int|None=None,db=Depends(database)):
     u=current_user(db,request); m=owned_meter(db,u,id); lo,hi=bounds(start,end)
+    if rolling_end is not None:
+        # Keep a shared boundary for both meters and the preceding reference window.
+        now=int(time.time())
+        if not now-7*DAY<=rolling_end<=now+300:
+            raise HTTPException(422,'Finestra mobile non valida.')
+        hi=min(now,rolling_end)+1
+        lo=hi-DAY
+        start=datetime.fromtimestamp(lo,TZ).date()
+        end=datetime.fromtimestamp(hi-1,TZ).date()
+        anchor=True
     rows=db.scalars(select(Reading).where(Reading.meter_id==m.id,Reading.ts>=lo,Reading.ts<hi).order_by(Reading.ts)).all()
     values=[]; daily={}; total=0; observed=0; incomplete=set()
     prev=db.scalar(select(Reading).where(Reading.meter_id==m.id,Reading.ts<lo).order_by(Reading.ts.desc()).limit(1)) if anchor else None

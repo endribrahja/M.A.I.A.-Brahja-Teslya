@@ -1,4 +1,4 @@
-import {esc, num, today} from './api.js';
+import {esc} from './api.js';
 
 const preference = matchMedia('(prefers-color-scheme: dark)');
 const themes = ['auto', 'light', 'dark'];
@@ -53,21 +53,11 @@ export function sparkline(days) {
     if (row.value == null) {
       if (segment.length) segments.push(segment);
       segment = [];
-    } else segment.push(index * 10 + ',' + (28 - 26 * row.value / maximum));
+    } else segment.push([recent.length===1?66:4+index*124/(recent.length-1),27-24*row.value/maximum]);
   });
   if (segment.length) segments.push(segment);
   return '<svg class="sparkline" viewBox="0 0 132 30" preserveAspectRatio="none" aria-hidden="true">' +
-    segments.map(points => '<polyline fill="none" stroke="currentColor" stroke-width="1.5" points="' + points.join(' ') + '"/>').join('') + '</svg>';
-}
-
-export function dashboardStats(data) {
-  const rows = Object.values(data.utilities);
-  const cost = rows.length && rows.every(row => row.cost != null)
-    ? new Intl.NumberFormat('it-IT', {style:'currency',currency:'EUR'}).format(rows.reduce((total,row) => total + row.cost, 0)) : 'N/D';
-  const cards = [['Acqua oggi', data.utilities.water], ['Gas oggi', data.utilities.gas]];
-  const date = today();
-  return '<div class="studio-metrics">' + cards.map(([name,row]) => {
-    const value = row?.days.find(d => d.date === date)?.value;
-    return '<article class="card"><span class="muted">' + esc(name) + '</span><strong>' + (value == null ? 'N/D' : num(value) + ' m³') + '</strong><small>Giornata in corso</small></article>';
-  }).join('') + '<article class="card"><span class="muted">Spesa del mese</span><strong>' + cost + '</strong><small>Stima a tariffa variabile</small></article></div>';
+    segments.map(points => points.length===1
+      ? '<circle cx="'+points[0][0]+'" cy="'+points[0][1]+'" r="2" fill="currentColor"/>'
+      : '<polyline fill="none" stroke="currentColor" stroke-width="1.5" points="'+points.join(' ')+'"/>').join('') + '</svg>';
 }

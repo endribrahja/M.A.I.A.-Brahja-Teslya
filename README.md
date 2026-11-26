@@ -57,3 +57,5 @@ FastAPI e SQLAlchemy gestiscono API, WebSocket, SQLite o PostgreSQL. Il frontend
 ## Limiti del prototipo
 
 I dati sono sintetici. Costi e risparmi dipendono da tariffe e ipotesi esplicite. Le fasce di previsione descrivono la variabilità delle osservazioni e le segnalazioni indicano variazioni da consultare. L’app opera con contatori e impianti dimostrativi. Il grafo 3D rappresenta un’unica casa a un piano. Il supporto di ogni combinazione fra provider, modello, browser e dispositivo richiede un collaudo dedicato.
+
+Per i controlli della dashboard, del modellino e della chat, consulta la [guida dell’interfaccia e la galleria](docs/ESPERIENZA.md).

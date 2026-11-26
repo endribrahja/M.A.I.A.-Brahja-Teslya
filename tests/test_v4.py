@@ -87,3 +87,26 @@ def test_forecast_holdout_is_chronological():
     assert results['train_end']<results['test_start']<=results['test_end']<predictions[0]['date']
     assert all(row['low']<=row['value']<=row['high'] for row in predictions)
     assert forecast(samples[:3],today,'water')==([], {})
+
+
+def test_rolling_meter_window_keeps_ownership_and_bounds():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo('Europe/Rome')
+    with TestClient(app) as owner, TestClient(app) as guest:
+        signup(owner)
+        signup(guest)
+        meter = owner.get('/api/meters').json()[0]
+        path = f"/api/meters/{meter['id']}/readings"
+        end = int(time.time())
+        date_label = datetime.fromtimestamp(end, tz).date().isoformat()
+        params = {'start': date_label, 'end': date_label, 'rolling_end': end}
+        result = owner.get(path, params=params)
+        assert result.status_code == 200
+        data = result.json()
+        assert data['rows']
+        assert all(end - 86400 < row['ts'] <= end for row in data['rows'])
+        assert data['days'][-1]['date'] == date_label
+        assert guest.get(path, params=params).status_code == 404
+        assert owner.get(path, params={**params, 'rolling_end': end + 301}).status_code == 422
