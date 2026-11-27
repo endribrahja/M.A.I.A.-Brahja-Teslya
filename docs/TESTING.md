@@ -13,7 +13,7 @@ npm run test:browser
 
 Il collaudo usa SQLite temporaneo. La suite Python copre sicurezza, autenticazione, TOTP, proprietà, statistiche, simulatore, esportazione e aggiornamenti. I nuovi test verificano letture collegate a eventi stanza, isolamento, CRUD della chat, tool calling con provider simulato e PDF per intervallo.
 
-Lo script Chromium avvia Uvicorn su loopback. Esplora le 12 pagine, genera un ciclo, interagisce con WebGL e i grafici, passa alla pianta, prova l’assistente e misura overflow a 375, 768, 1024, 1440 e 1920 px. Scrive le immagini in `docs/screenshots/premium/` e stampa il tempo della procedura demo osservato in quella sessione. SwiftShader usa rendering software e il valore non rappresenta il frame rate su un dispositivo reale.
+Lo script Chromium avvia Uvicorn su loopback con un database temporaneo. Apre le aree di Architectural Intelligence e salva le catture in `docs/screenshots/architectural/dopo/`. La panoramica viene verificata a 2560 × 1440, 1920 × 1080, 1440 × 900, 1366 × 768, 1024 × 768, 768 × 1024 e 390 × 844. SwiftShader usa rendering software.
 
 `npm run check` verifica la sintassi JavaScript. ESLint controlla tutti i moduli sorgente e TypeScript verifica il modulo HTTP e le utilità condivise tipizzate con JSDoc. Il frontend mantiene moduli JavaScript nativi. `python -m scripts.benchmark` misura separatamente l’API con dati sintetici. I risultati di collaudi precedenti sono in [VERIFICA.md](VERIFICA.md).
 
@@ -27,7 +27,7 @@ Lo script Chromium avvia Uvicorn su loopback. Esplora le 12 pagine, genera un ci
 - Migrazione applicata due volte a una copia del backup. Contenuto delle tabelle originali identico, integrità e chiavi esterne valide.
 - Gli screenshot sono stati controllati visivamente. I test del provider generativo usano risposte simulate. Nessuna misurazione su GPU o dispositivi mobili fisici.
 
-## Verifica del redesign
+## Verifica storica del redesign precedente
 
 - `python -m pytest -q` nell’ambiente virtuale ha completato 17 test. Starlette ha emesso un avviso di deprecazione sull’alias `anyio.abc.BlockingPortal`.
 - `npm run build`, `npm run check`, `npm run lint`, `npm run typecheck` e `git diff --check` sono passati.
@@ -35,3 +35,10 @@ Lo script Chromium avvia Uvicorn su loopback. Esplora le 12 pagine, genera un ci
 - Il collaudo visivo usa Chromium headless e SwiftShader. Le catture sono raccolte nella [galleria dell’interfaccia](ESPERIENZA.md#galleria-di-verifica).
 - La sessione finale ha completato le 12 aree dell’app e le verifiche a 375, 768, 1024, 1440 e 1920 px. Ha verificato selezione nella scena, simulazione, grafici 2D/3D, CSV, ricerca e inserimento da tastiera nel catalogo, ripristino della chat e passaggio dalla chat alla casa con un evento simulato. Nessun errore JavaScript inatteso è stato registrato.
 - Nella sessione finale sono trascorsi 4.320 ms dal clic sulla demo alla disponibilità del canvas dell’anteprima. La misura include creazione del profilo demo, richieste HTTP e inizializzazione WebGL con SwiftShader.
+
+## Esito Spatial Home
+
+- 17 test Python passati con un avviso di deprecazione Starlette/AnyIO. Build, sintassi, lint, TypeScript e controllo del diff passati.
+- Playwright ha completato dieci aree e sei dimensioni, senza overflow orizzontale nelle schermate controllate né errori JavaScript inattesi. Ha verificato hotspot, impianti, cicli demo, aggiornamenti WebSocket con lo stesso canvas, pianta con WebGL disabilitato, CSV, filtri, ordinamento e catalogo della chat da tastiera.
+- Il motore statistico è stato verificato in esecuzione. Il provider linguistico risulta non configurato. La transizione dalla chat alla casa è stata verificata con un evento controllato.
+- Le catture finali includono cicli di doccia, lavatrice e riscaldamento registrati attraverso le API del simulatore nel database di test.

@@ -8,4 +8,6 @@ Doccia 9 L/min, lavatrice 48 L/ciclo, lavastoviglie 12 L/ciclo, rubinetto 24 L/4
 
 ## Licenze
 
-Il modello procedurale e il logo del repository sono risorse originali del progetto. Three.js e OrbitControls 0.180.0 sono distribuiti con licenza MIT inclusa nell’output del build. La scena non scarica modelli o texture esterni. Le tubazioni rappresentano un impianto dimostrativo. Le anomalie hanno valore informativo.
+Il modello procedurale e il logo del repository sono risorse originali del progetto. Three.js, OrbitControls e RoundedBoxGeometry 0.180.0 sono distribuiti con licenza MIT inclusa nell’output del build. La scena non scarica modelli o texture esterni. Le tubazioni rappresentano un impianto dimostrativo. Le anomalie hanno valore informativo.
+
+I contatori della casa e della pagina Contatori condividono le geometrie procedurali originali. Le schede dei contatori creano la scena quando il dispositivo entra nel viewport e conservano la lettura testuale e l’illustrazione CSS come alternativa. Lo zoom della casa è azionabile dalla barra degli strumenti.

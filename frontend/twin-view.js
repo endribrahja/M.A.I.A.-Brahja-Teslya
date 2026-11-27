@@ -2,19 +2,24 @@ import {api, esc, dateTime, num, today} from './api.js';
 import {icon} from './icons.js';
 import {sparkline} from './experience.js';
 
-import {roomLayout, meterLayout} from './house-layout.js';
+import {roomLayout, meterLayout, deviceLayout} from './house-layout.js';
 
 const destinations=[...roomLayout,...meterLayout];
+const devicesById=new Map(deviceLayout.map(device=>[device.id,device]));
 const rooms=Object.fromEntries(destinations.map(({id,label})=>[id,label]));
-const modes = {section:'Interni',exterior:'Casa completa',roofless:'Senza tetto',water:'Impianto acqua',
-  gas:'Impianto gas',consumption:'Consumi',anomalies:'Anomalie',plan:'Vista per piano',exploded:'Esplosa'};
+const modes = {section:'Interni',exterior:'Casa completa',roofless:'Senza tetto',water:'Impianto acqua',gas:'Impianto gas',plan:'Vista dall’alto'};
 const directions = {front:'Fronte',back:'Retro',left:'Sinistra',right:'Destra',top:'Alto'};
 const roomItem = ([id,label]) => `<button type="button" class="secondary small" data-twin-room="${id}" aria-pressed="false">${icon(['water','gas'].includes(id)?id:'house')}${label}</button>`;
 
 export function twinMarkup() {
   return `<section class="card twin-card spaced" aria-label="Modello dell’abitazione">
     <div class="scene-tools twin-toolbar" aria-label="Impostazioni della scena">
-      <label>Vista <select data-mode>${Object.entries(modes).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label>
+      ${[['section','Vista interna'],['exterior','Vista esterna'],['water','Impianto acqua'],['gas','Impianto gas']].map(([id,label])=>`<button class="secondary small" data-scene-mode="${id}" aria-pressed="${id==='section'}">${label}</button>`).join('')}
+      <button class="secondary small" data-camera="top">Dall’alto</button><button class="secondary small" data-camera="iso">Ripristina visuale</button>
+      <button class="secondary small" data-camera-zoom="in" aria-label="Ingrandisci la casa">+</button>
+      <button class="secondary small" data-camera-zoom="out" aria-label="Riduci la casa">−</button>
+      <button class="secondary small" data-fullscreen>Schermo intero</button>
+      <label class="sr-only">Vista <select data-mode>${Object.entries(modes).map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label>
       <label>Camera <select data-projection><option value="orthographic">Ortografica</option><option value="perspective">Prospettica</option></select></label>
       <details class="twin-options"><summary>Opzioni</summary><div>
         <label>Qualità <select data-quality><option value="auto">Automatica</option><option value="low">Performance</option><option value="medium">Bilanciata</option><option value="high">Alta qualità</option><option value="2d">Pianta 2D</option></select></label>
@@ -28,11 +33,11 @@ export function twinMarkup() {
           <div class="scene-canvas" id="twin-canvas"><div class="scene-message" role="status">Preparazione della scena…</div></div>
           <div class="orientation" aria-label="Orientamento camera">${Object.entries(directions).map(([key,label])=>`<button class="secondary small" data-camera="${key}">${label}</button>`).join('')}</div>
         </div>
-        <div class="scene-tools twin-camera"><button class="secondary small" data-camera="iso">Isometrica</button><button class="secondary small" data-camera="top">Dall’alto</button><button class="secondary small" data-camera="side">Laterale</button><button class="secondary small" data-fullscreen>Schermo intero</button></div>
+
       </div>
       <aside class="twin-inspector">
-        <details open class="twin-selector"><summary>Stanze e contatori</summary><div class="room-buttons">${Object.entries(rooms).map(roomItem).join('')}</div></details>
-        <div data-room-panel aria-live="polite"><p class="muted">Seleziona un ambiente o un contatore.</p></div>
+        <details class="twin-selector"><summary>Stanze e contatori</summary><div class="room-buttons">${Object.entries(rooms).map(roomItem).join('')}</div></details>
+        <div data-room-panel class="sp-twin-panel" aria-live="polite" hidden></div>
       </aside>
     </div>
     <p class="muted twin-note">Impianti dimostrativi · Segnalazioni informative</p>
@@ -54,6 +59,7 @@ export function mountTwin({home, meters, analytics, state, sceneAction, onUpdate
   quality.value=localStorage.getItem('maia-quality') || 'auto';
 
   function configure() {
+    for(const button of card.querySelectorAll('[data-scene-mode]')) button.setAttribute('aria-pressed',String(button.dataset.sceneMode===mode.value));
     view?.configure({
       mode:mode.value,
       night:card.querySelector('[data-night]').checked,
@@ -69,7 +75,7 @@ export function mountTwin({home, meters, analytics, state, sceneAction, onUpdate
     }
   }
   function enable3dControls(enabled) {
-    for(const input of card.querySelectorAll('[data-camera],[data-mode],[data-projection],[data-pipe],[data-night]')) {
+    for(const input of card.querySelectorAll('[data-camera],[data-camera-zoom],[data-mode],[data-projection],[data-pipe],[data-night],[data-scene-mode]')) {
       input.disabled=!enabled;
     }
     card.querySelector('.orientation').hidden=!enabled;
@@ -107,8 +113,15 @@ export function mountTwin({home, meters, analytics, state, sceneAction, onUpdate
     }
   }
   function select(id, focus=true) {
-    if(!Object.hasOwn(rooms,id)) return;
+    const device=devicesById.get(id);
+    if(!Object.hasOwn(rooms,id)&&!device) return;
     selected=id;
+    panel.hidden=false;
+    if(device){
+      panel.innerHTML=deviceSummary(device,state,true);
+      if(focus) view?.focus(id);
+      return;
+    }
     syncSelection();
     const meter=meters.find(m=>m.kind===id);
     if(meter) {
@@ -131,6 +144,7 @@ export function mountTwin({home, meters, analytics, state, sceneAction, onUpdate
         (devices.length?'<div class="room-buttons">'+devices.map(device=>'<button class="secondary" data-appliance="'+esc(device.id)+'">'+esc(device.name)+'</button>').join('')+'</div>':'<p class="muted">Nessun dispositivo azionabile in questa stanza.</p>')+
         (events.length?'<h4>Eventi simulati</h4><ul>'+events.map(event=>'<li>'+esc(devices.find(device=>device.id===event.action)?.name??event.action)+' · '+volume(event.volume)+' · '+dateTime(event.ts)+'</li>').join('')+'</ul>':'<p class="muted">Nessun evento attribuito alla stanza negli ultimi 30 giorni.</p>');
     }
+    panel.insertAdjacentHTML('afterbegin',closePanel);
     if(mode.value==='exterior') {mode.value='section';configure();}
     if(focus) view?.focus(id);
   }
@@ -144,9 +158,15 @@ export function mountTwin({home, meters, analytics, state, sceneAction, onUpdate
     if(!button) return;
     const room=button.dataset.twinRoom||button.dataset.planRoom;
     if(room) select(room);
-    if(button.dataset.camera) view?.view(button.dataset.camera);
+    if(button.hasAttribute('data-close-context')) {panel.hidden=true;selected=null;syncSelection();return;}
+    if(button.dataset.sceneMode){mode.value=button.dataset.sceneMode;configure();}
+    if(button.dataset.cameraZoom) view?.zoomBy(button.dataset.cameraZoom==='in'?1.25:.8);
+    if(button.dataset.camera){
+      if(button.dataset.camera==='iso'){mode.value='section';configure();panel.hidden=true;}
+      view?.view(button.dataset.camera);
+    }
     if(button.hasAttribute('data-fullscreen')) {
-      const viewport=card.querySelector('.twin-main');
+      const viewport=card;
       try {
         if(document.fullscreenElement===viewport) await document.exitFullscreen();
         else await viewport.requestFullscreen();
@@ -172,19 +192,127 @@ export function mountTwin({home, meters, analytics, state, sceneAction, onUpdate
       panel.append(message);
     } finally {pending=false;button.disabled=false;}
   },{signal:controller.signal});
-  if(['anomalies','reset','water-system','gas-system'].includes(sceneAction)) mode.value=({'water-system':'water','gas-system':'gas',reset:'section',anomalies:'anomalies'})[sceneAction];
+  if(['anomalies','reset','water-system','gas-system'].includes(sceneAction)) mode.value=({'water-system':'water','gas-system':'gas',reset:'section',anomalies:'section'})[sceneAction];
   else if(sceneAction) select(sceneAction);
   rebuild();
   return ()=>{generation++;view?.dispose();controller.abort();};
 }
 
-export async function mountPreview() {
+const closePanel='<button class="icon-button sp-context-close" type="button" data-close-context aria-label="Chiudi dettagli">×</button>';
+
+function deviceSummary(device,state,interactive=false){
+  const event=state.events.find(item=>item.action===device.id);
+  const managed=state.appliances.some(item=>item.id===device.id);
+  return `${closePanel}<h3>${device.label}</h3><p>${device.kind==='water'?'Acqua':'Gas'} · ${rooms[device.room]}</p>
+    <p>${event?`Ultimo ciclo · ${volume(event.volume)} · ${dateTime(event.ts)}`:'Nessun ciclo registrato negli ultimi 30 giorni.'}</p>
+    ${interactive&&managed?`<button class="secondary small" data-appliance="${device.id}">Avvia ciclo demo</button>`:''}`;
+}
+
+export function mountPreview({meters,analytics,state}){
   const host=document.querySelector('#house-preview');
-  if(!host) return;
-  try {
-    const {houseScene}=await import('./scene.js');
-    if(host.isConnected) return houseScene(host,{quality:'low',preview:true}).dispose;
-  } catch {
-    host.textContent='Anteprima WebGL indisponibile';
+  const dashboard=host.closest('.spatial-dashboard');
+  const panel=dashboard.querySelector('[data-preview-detail]');
+  const lifecycle=new AbortController();
+  let view, mode='section', meterOnly=false, isFallback=false, selected;
+
+  function select(id,focus=true){
+    selected=id;
+    const meter=meters.find(item=>item.kind===id);
+    const device=devicesById.get(id);
+    if(!meter&&!device){
+      panel.innerHTML=closePanel+'<h3>'+esc(rooms[id])+'</h3><button class="secondary small" data-scene-target="'+id+'">Apri nella casa</button>';
+    }else if(meter){
+      const recent=analytics.utilities[id]?.days.find(row=>row.date===today())?.value;
+      panel.innerHTML=`${closePanel}<h3>${rooms[id]}</h3><p>${esc(meter.code)} · ${esc(meter.status)}</p>
+        <p>${volume(meter.last)} cumulativi · ${volume(recent)} oggi</p><p>${dateTime(meter.updated)}</p>
+        ${state.anomalies[id]?'<button class="sp-link" data-page="bell">Consulta le notifiche</button>':''}`;
+    }else panel.innerHTML=deviceSummary(device,state);
+    panel.hidden=false;
+    if(meter&&focus) view?.focus(id);
   }
+
+  function fallback(){
+    isFallback=true;
+    host.closest('.sp-model').classList.add('is-plan');
+    host.innerHTML='<div class="floor-plan" aria-label="Planimetria interattiva">'+destinations.map(({id,label,plan:[row,col,span]})=>
+      `<button class="secondary small" data-preview-room="${id}" style="--row:${row};--col:${col};--span:${span}">${label}</button>`).join('')+'</div>';
+    dashboard.querySelectorAll('[data-preview-action]').forEach(button=>button.disabled=true);
+  }
+
+  async function build(){
+    try{
+      if(localStorage.getItem('maia-quality')==='2d'){fallback();return;}
+      const {houseScene}=await import('./scene.js');
+      if(lifecycle.signal.aborted||!host.isConnected) return;
+      host.replaceChildren();
+      view=houseScene(host,{quality:window.innerWidth<720?'low':'medium',preview:true,onSelect:select,flows:state.flow});
+      view.configure({mode});
+      view.meterMode(meterOnly);
+      host.querySelector('canvas').addEventListener('webglcontextlost',event=>{
+        if(!view||lifecycle.signal.aborted) return;
+        event.preventDefault();
+        const lost=view;
+        view=null;
+        fallback();
+        lost.dispose();
+      },{once:true});
+    }catch{if(!lifecycle.signal.aborted) fallback();}
+  }
+  const observer=new IntersectionObserver(([entry])=>{
+    if(entry.isIntersecting){observer.disconnect();build();}
+  });
+  observer.observe(host);
+  dashboard.addEventListener('click',event=>{
+    const button=event.target.closest('button');
+    if(!button) return;
+    if(button.hasAttribute('data-close-context')) panel.hidden=true;
+    if(button.dataset.previewRoom) select(button.dataset.previewRoom);
+    if(button.dataset.overviewKind){
+      for(const node of dashboard.querySelectorAll('[data-overview-series]')) node.hidden=node.dataset.overviewSeries!==button.dataset.overviewKind;
+      for(const item of dashboard.querySelectorAll('[data-overview-kind]')) item.setAttribute('aria-pressed',String(item===button));
+    }
+    const action=button.dataset.previewAction;
+    if(!action||button.disabled) return;
+    panel.hidden=true;
+    mode=action==='water'||action==='gas'?action:'section';
+    meterOnly=action==='meters';
+    view?.configure({mode});
+    view?.meterMode(meterOnly);
+    view?.view('iso');
+    panel.closest('.sp-model').dataset.view=action;
+    if(matchMedia('(max-width: 850px)').matches) host.scrollIntoView({block:'center'});
+  },{signal:lifecycle.signal});
+  function trendTooltip(event,visible){
+    if(!event.target.matches('[data-sp-trend-point]')) return;
+    const tooltip=event.target.closest('.sp-trend-wrap').querySelector('output');
+    tooltip.hidden=!visible;
+    if(visible) tooltip.textContent=event.target.getAttribute('aria-label');
+  }
+  for(const [type,visible] of [['pointerover',true],['focusin',true],['pointerout',false],['focusout',false]]){
+    dashboard.addEventListener(type,event=>trendTooltip(event,visible),{signal:lifecycle.signal});
+  }
+  dashboard.addEventListener('change',event=>{
+    if(!event.target.matches('[data-room-utility]')) return;
+    for(const series of dashboard.querySelectorAll('[data-room-series]')) series.hidden=series.dataset.roomSeries!==event.target.value;
+  },{signal:lifecycle.signal});
+  function update(html, readings){
+    ({meters,analytics,state}=readings);
+    const template=document.createElement('template');
+    template.innerHTML=html;
+    const kind=dashboard.querySelector('[data-overview-kind][aria-pressed=true]')?.dataset.overviewKind;
+    const utility=dashboard.querySelector('[data-room-utility]').value;
+    for(const selector of ['.sp-left','.sp-ai','.sp-bottom']){
+      dashboard.querySelector(selector).replaceWith(template.content.querySelector(selector));
+    }
+    dashboard.dataset.liveRefresh='true';
+    if(kind) dashboard.querySelector('[data-overview-kind='+kind+']')?.click();
+    const picker=dashboard.querySelector('[data-room-utility]');
+    picker.value=utility;
+    picker.dispatchEvent(new window.Event('change',{bubbles:true}));
+    if(isFallback) dashboard.querySelectorAll('[data-preview-action]').forEach(button=>button.disabled=true);
+    if(!panel.hidden&&selected) select(selected,false);
+    view?.configure({mode,flows:state.flow});
+  }
+  return {update,dispose:()=>{observer.disconnect();lifecycle.abort();view?.dispose();}};
+
 }

@@ -44,4 +44,4 @@ fi
 npm run build
 echo '>>> Lo schema viene inizializzato da FastAPI con migrazioni additive'
 echo ">>> Avvio M.A.I.A. sulla porta ${PORT:-8000}"
-exec "$PY" -m uvicorn backend.main:app --app-dir "$ROOT_DIR" --host 0.0.0.0 --port "${PORT:-8000}"
+exec "$PY" -m uvicorn backend.main:app --app-dir "$ROOT_DIR" --host "${MAIA_BIND_HOST:-0.0.0.0}" --port "${PORT:-8000}"

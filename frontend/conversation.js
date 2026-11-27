@@ -94,7 +94,6 @@ export function mountConversation(home, openScene, context={}) {
   const lifecycle=new AbortController();
   const panel=document.createElement('details');
   panel.className='chat-controls';
-  panel.open=matchMedia('(min-width: 1024px)').matches;
   panel.innerHTML='<summary>Cronologia</summary><div class="chat-history"><input type="search" aria-label="Cerca conversazioni" placeholder="Cerca conversazioni"><select aria-label="Conversazioni salvate"></select><div class="chat-history-actions"><button class="secondary small" data-chat="rename">Rinomina</button><button class="secondary small" data-chat="delete">Elimina</button><button class="secondary small" data-chat="regenerate">Rigenera</button></div></div>';
   root.querySelector('.chat-workspace').prepend(panel);
   const select=panel.querySelector('select'), search=panel.querySelector('input');
@@ -121,17 +120,19 @@ export function mountConversation(home, openScene, context={}) {
   }
   function showSuggestions(last='') {
     const query=last.toLocaleLowerCase('it');
-    const items=query.includes('gas')?['Quanto gas ho consumato questo mese?','Come posso ridurre il consumo di gas?']:
+    const items=!last?['Analizza i miei consumi.','Quanto sto spendendo?','Mostrami la mia casa.','Come posso risparmiare?']:
+      query.includes('gas')?['Quanto gas ho consumato questo mese?','Come posso ridurre il consumo di gas?']:
       query.includes('acqua')?['Quanta acqua ho consumato oggi?','Come posso ridurre il consumo di acqua?']:
       [context.hasAnomaly?(configured?'Spiegami l’ultima anomalia.':'Ho registrato consumi insoliti?'):'Come stanno andando i miei consumi?',
-        context.nearGoal?'Come posso evitare di superare il mio obiettivo?':'Come si confrontano i miei consumi con il periodo precedente?',
+        'Come si confrontano i miei consumi con il periodo precedente?',
         context.multipleHomes&&configured?'Come posso confrontare i dati delle mie abitazioni?':'Quanto sto spendendo questo mese?'];
     suggestions.replaceChildren();
-    for(const question of items.filter(question=>question.toLocaleLowerCase('it')!==query).slice(0,3)) {
+    for(const question of items.filter(question=>question.toLocaleLowerCase('it')!==query).slice(0,last?3:4)) {
       const button=document.createElement('button');
       button.className='secondary small';
       button.textContent=question;
-      button.dataset.question=question;
+      if(question==='Mostrami la mia casa.'&&!configured) button.dataset.page='house';
+      else button.dataset.question=question;
       suggestions.append(button);
     }
   }
@@ -191,7 +192,7 @@ export function mountConversation(home, openScene, context={}) {
     suggestions.replaceChildren();
     options();
     status.textContent='Elaborazione…';
-    let view, report;
+    let view;
     const series=[];
     try {
       if(!activeId) {
@@ -235,7 +236,6 @@ export function mountConversation(home, openScene, context={}) {
             }
             if(message.type==='error') throw new Error(message.value);
             if(message.type==='view') view=message.value;
-            if(message.type==='report') report=message.value;
             if(message.type==='series') series.push(message.value);
             if(message.type==='done') done=true;
           }
@@ -247,13 +247,6 @@ export function mountConversation(home, openScene, context={}) {
       for(const payload of series) {
         const chart=toolChart(payload);
         if(chart) target.after(chart);
-      }
-      if(Array.isArray(report)&&report.length===2&&report.every(day=>/^\d{4}-\d{2}-\d{2}$/.test(day))) {
-        const link=document.createElement('a');
-        link.className='secondary small report-link';
-        link.textContent='Scarica PDF del periodo';
-        link.href='/api/homes/'+home+'/report.pdf?'+new URLSearchParams({start:report[0],end:report[1]});
-        target.after(link);
       }
       if(view) {
         const button=document.createElement('button');

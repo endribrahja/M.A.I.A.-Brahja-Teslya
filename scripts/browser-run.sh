@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export MAIA_TEST_URL=http://127.0.0.1:8054
+export MAIA_SCREENSHOTS="${MAIA_SCREENSHOTS:-docs/screenshots/architectural/dopo}"
 maia_test_dir="$(mktemp -d)"
-export MAIA_DB="$maia_test_dir/browser.db" MAIA_SIM_INTERVAL=0 PORT=8054
+export MAIA_DB="$maia_test_dir/browser.db" MAIA_SIM_INTERVAL=0 MAIA_BIND_HOST=127.0.0.1 PORT=8054
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 bash start.sh >"$maia_test_dir/server.log" 2>&1 &
 maia_pid=$!

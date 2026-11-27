@@ -12,7 +12,7 @@ export function consumptionChart(data, options={}) {
       <button class="secondary small" data-chart-fullscreen>Schermo intero</button>
       <button class="secondary small" data-chart-csv>CSV</button>
     </div>
-    <div class="line-chart" tabindex="0" role="group" aria-label="Serie giornaliera. Usa le frecce sinistra e destra per leggere i valori."></div>
+    <div class="line-chart" tabindex="0" role="group" aria-label="Serie giornaliera. Usa le frecce per leggere i valori, Home e Fine per gli estremi."></div>
     <output class="chart-reading" aria-live="polite"></output>
     <details class="chart-values"><summary>Valori numerici del grafico</summary>
     <div class="table-wrap"><table><thead><tr><th>Giorno</th><th>Valore (${esc(unit)})</th></tr></thead><tbody>${rows.map(row=>`<tr><td>${row.date}</td><td>${row.value==null?'Non disponibile':num(row.value)}</td></tr>`).join('')}</tbody></table></div></details>
@@ -28,14 +28,16 @@ export function bindConsumptionCharts(root) {
     const x=at=>rows.length===1?300:at/(rows.length-1)*600;
     const y=value=>112-(value/maximum)*104;
     function select(at) {
-      index=Math.min(rows.length-1,Math.max(0,at));
+      const next=Math.min(rows.length-1,Math.max(0,at));
+      if(next===index) return;
+      index=next;
       const row=rows[index], cursor=plot.querySelector('[data-crosshair]'), point=plot.querySelector('[data-point]');
       cursor.setAttribute('x1',x(index));
       cursor.setAttribute('x2',x(index));
       point.style.display=row.value==null?'none':'';
       point.setAttribute('cx',x(index));
       point.setAttribute('cy',y(row.value??0));
-      output.textContent=`${row.date} · ${row.value==null?'Dato non disponibile':num(row.value)+' '+unit} · ${source}`;
+      output.textContent=`${row.label} · ${row.value==null?'Dato non disponibile':num(row.value)+' '+unit} · ${source}`;
     }
     function draw() {
       rows=size.value==='0'?full:full.slice(-Number(size.value));
@@ -51,15 +53,21 @@ export function bindConsumptionCharts(root) {
         <div class="line-body"><svg viewBox="-3 0 606 118" preserveAspectRatio="none" aria-hidden="true">
           ${[8,60,112].map(height=>`<line class="line-grid" x1="0" x2="600" y1="${height}" y2="${height}"/>`).join('')}
           ${groups.map(group=>group.length===1?`<circle class="observed-dot" cx="${group[0][0]}" cy="${group[0][1]}" r="2.5"/>`:
-            `<polyline points="${group.map(point=>point.join(',')).join(' ')}"/>`).join('')}
+            `<polygon class="line-area" points="${group[0][0]},112 ${group.map(point=>point.join(',')).join(' ')} ${group.at(-1)[0]},112"/>
+              <polyline points="${group.map(point=>point.join(',')).join(' ')}"/>`).join('')}
           <line data-crosshair y1="5" y2="112"/><circle data-point r="4"/>
         </svg><div class="x-axis"><span>${rows[0].label}</span><span>${rows.at(-1).label}</span></div></div>`;
+      index=undefined;
       select(rows.length-1);
     }
     size.addEventListener('change',draw);
     plot.addEventListener('keydown',event=>{
       const step={ArrowLeft:-1,ArrowRight:1}[event.key];
       if(step) {event.preventDefault();select(index+step);}
+      if(event.key==='Home'||event.key==='End') {
+        event.preventDefault();
+        select(event.key==='Home'?0:rows.length-1);
+      }
     });
     plot.addEventListener('pointermove',event=>{
       const bounds=plot.querySelector('svg').getBoundingClientRect();

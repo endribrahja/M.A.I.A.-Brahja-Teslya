@@ -2,9 +2,10 @@ import {esc} from './api.js';
 
 const preference = matchMedia('(prefers-color-scheme: dark)');
 const themes = ['auto', 'light', 'dark'];
-export function applyTheme(selected = localStorage.getItem('maia-theme') || 'auto') {
+export function applyTheme(selected = localStorage.getItem('maia-theme') || 'light') {
   document.documentElement.dataset.theme = selected === 'auto' ? (preference.matches ? 'dark' : 'light') : selected;
   document.documentElement.dataset.themeChoice = selected;
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content',document.documentElement.dataset.theme==='dark'?'#1c211f':'#f7f6f2');
   const button = document.querySelector('[data-action=theme]');
   if (button) button.title = 'Tema ' + ({auto:'automatico', light:'chiaro', dark:'scuro'}[selected]);
 }

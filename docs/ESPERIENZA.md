@@ -1,29 +1,31 @@
-# Interfaccia M.A.I.A.
+# M.A.I.A. Spatial Home
 
-## Panoramica e analisi
+La navigazione superiore porta a Panoramica, Casa virtuale, Acqua, Gas, Contatori, Storico e MAIA AI. Notifiche, Impostazioni e Profilo hanno comandi dedicati nella stessa barra. Il selettore dell’abitazione è disponibile nell’intestazione dopo l’accesso.
 
-La dashboard mostra acqua, gas, spesa variabile stimata e anomalie filtrate per l’abitazione e il periodo selezionati. I volumi sono distinti per utenza. La spesa è disponibile quando ci sono volumi osservati e tariffe per tutti i contatori mostrati. Le percentuali confrontano le medie sui giorni osservati, oppure il volume registrato nelle due finestre successive di 24 ore.
+## Panoramica
 
-Il filtro **Ultime 24 ore** usa l’istante di selezione come termine e si ricalcola premendo **Aggiorna**. I grafici raggruppano il volume per giorno locale della lettura finale. In una finestra mobile i giorni ai bordi possono essere parziali. La risoluzione dipende dalle letture disponibili e gli intervalli senza un valore restano visibili come interruzioni. Il PDF rimane un report per date civili. Per esportare la finestra mobile esatta usa il CSV dei consumi o delle letture.
+L’anello mostra la **percentuale di giorni con un volume disponibile negli ultimi 30 giorni** per l’utenza selezionata. La finestra precedente ha la stessa durata e il confronto usa la media dei giorni osservati in ciascun periodo. La spesa per periodo usa il volume osservato e la tariffa variabile impostata. La scheda dei consumi attuali mostra separatamente i volumi di oggi e la spesa mensile stimata.
 
-In **Analisi** puoi ingrandire gli ultimi 7, 30 o 90 giorni se il periodo lo consente. Passa il puntatore sul grafico o usa le frecce dopo avergli dato il focus per leggere il giorno, il valore, l’unità e la provenienza. Lo stesso pannello offre CSV e schermo intero. Le viste dei costi e delle segnalazioni sono espandibili. La vista WebGL mostra barre o superfici per utenza. Il tratteggio distingue le previsioni e la fascia indica la variabilità stimata dal backend.
+Il grafico compatto mostra gli ultimi sette giorni di calendario, con una scala relativa per utenza. I punti espongono il valore assoluto e il giorno. I volumi per ambiente provengono dagli eventi attribuiti dal simulatore negli ultimi 30 giorni. Le barre di acqua e gas sono consultabili separatamente. L’indicatore di connessione riflette l’apertura della sessione WebSocket, mentre lo stato del simulatore indica la configurazione automatica, manuale o MQTT.
 
 ## Casa virtuale
 
-Apri **Casa virtuale** per lo spaccato ortografico a un piano. Il selettore cambia tra interni, casa completa, senza tetto, consumi, anomalie e impianti. **Opzioni** contiene qualità, modalità notturna, pianta 2D e sovrapposizione degli impianti. Le modalità idrica e gas evidenziano il rispettivo tracciato e rendono trasparenti le partizioni. La vista prospettica si può scegliere separatamente. Le preferenze di qualità e proiezione persistono nel browser.
+Il modello procedurale è condiviso fra la Panoramica e la pagina Casa virtuale. Gli hotspot proiettano le posizioni dei contatori e degli elettrodomestici nel viewport e si muovono con la camera. Se due indicatori si sovrappongono, la scena dà priorità ai contatori. Seleziona un indicatore per i dettagli. Nella pagina Casa virtuale si possono registrare cicli demo dai dispositivi collegati al simulatore. La toolbar offre viste interne ed esterne, impianti, vista dall’alto, ripristino e schermo intero. Il menu Opzioni contiene qualità, proiezione, pianta 2D e modalità notturna.
 
-Trascina per ruotare, usa il tasto destro per spostare e la rotellina per lo zoom. Su touch, un dito ruota e due dita spostano o ingrandiscono. La palette di orientamento e la barra inferiore offrono viste predefinite. La pianta è disponibile anche se WebGL non è utilizzabile. La selezione di un ambiente o dei contatori aggiorna il pannello. I volumi di stanza derivano dai cicli attribuiti dal simulatore. I contatori mostrano letture cumulative, aggiornamento, stato, anomalie e una serie recente quando ci sono dati.
+Trascina per ruotare e usa la rotellina per ingrandire. Su touch, un dito ruota e due dita spostano o ingrandiscono. La pianta interattiva è disponibile quando WebGL 2 manca. Le tubazioni sono dimostrative.
+
+## Utenze, contatori e storico
+
+Acqua e Gas integrano letture cumulative, volume filtrato, confronto, stima economica, storico recente e previsioni. Il filtro **Ultime 24 ore** usa l’istante di selezione come termine. I grafici raggruppano i volumi per giorno locale della lettura finale e i giorni ai bordi possono essere parziali. Nei grafici principali usa il puntatore o le frecce dopo aver dato il focus per leggere i valori. Sono disponibili CSV e schermo intero. La pagina Contatori collega la telemetria direttamente al punto selezionato nella casa. Lo Storico offre grafico, filtro, ordinamento e paginazione.
 
 ## MAIA AI
 
-Il catalogo **Esplora le domande** contiene categorie espandibili e ricerca istantanea. Usa Tab, frecce e Invio per scegliere un suggerimento. La scelta compila la bozza, che puoi modificare. Invio invia e Maiusc+Invio aggiunge una riga. Esc chiude il catalogo. La chat conserva la cronologia per abitazione sul server e ricorda la conversazione attiva in quella scheda del browser. Le risposte si possono copiare e l’ultima si può rigenerare.
-
-La modalità statistica locale offre analisi circoscritte. Il catalogo segnala le domande che richiedono un modello linguistico. Con un provider configurato, il modello può richiamare gli strumenti autorizzati e restituire **Visualizza nella casa 3D** per una stanza, un contatore o un impianto. Per verificare il provider configurato esegui `python -m scripts.ai_check`.
+**Esplora le domande** apre un catalogo ricercabile. Tab, frecce e Invio permettono di selezionare una domanda e inserirla nella bozza. Invio la trasmette e Maiusc+Invio aggiunge una riga. La cronologia è isolata per abitazione. Le anomalie sono consultabili in Notifiche e tramite le capacità di MAIA AI. La modalità statistica locale resta disponibile e il catalogo segnala le domande che richiedono un modello linguistico. Esegui `python -m scripts.ai_check` per verificare la configurazione del provider.
 
 ## Galleria di verifica
 
-- [Accesso](screenshots/premium/accesso.png) · [Dashboard](screenshots/premium/dashboard.png) · [Tema chiaro](screenshots/premium/tema-chiaro.png) · [Tema scuro](screenshots/premium/tema-scuro.png)
-- [Casa](screenshots/premium/casa.png) · [Senza tetto](screenshots/premium/casa-senza-tetto.png) · [Stanza](screenshots/premium/stanza.png) · [Contatore](screenshots/premium/contatore.png) · [Acqua](screenshots/premium/impianto-acqua.png) · [Gas](screenshots/premium/impianto-gas.png)
-- [Grafici 2D](screenshots/premium/grafici-2d.png) · [Grafici 3D](screenshots/premium/grafici-3d.png)
-- [MAIA AI](screenshots/premium/assistente.png) · [Schermata iniziale](screenshots/premium/assistente-vuoto.png) · [Catalogo](screenshots/premium/catalogo.png)
-- [Dashboard mobile](screenshots/premium/mobile.png) · [Casa mobile](screenshots/premium/mobile-casa.png) · [Catalogo mobile](screenshots/premium/mobile-catalogo.png)
+- [Dashboard a 1440 × 900](screenshots/spatial/dashboard-1440.png)
+- [Dashboard a 1920 × 1080](screenshots/spatial/dashboard-1920.png)
+- [Dashboard a 390 px](screenshots/spatial/dashboard-390.png)
+- [Casa virtuale](screenshots/spatial/casa-1440.png)
+- [MAIA AI su mobile](screenshots/spatial/maia-ai-390.png)
